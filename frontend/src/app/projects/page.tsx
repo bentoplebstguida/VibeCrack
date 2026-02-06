@@ -70,7 +70,7 @@ function ProjectsContent() {
   const handleStartScan = async (projectId: string, domain: string) => {
     try {
       const scanId = await startScan(projectId, domain);
-      router.push(`/scans/${scanId}`);
+      router.push(`/scans/detail?scanId=${scanId}`);
     } catch (err: unknown) {
       console.error("Erro ao iniciar scan:", err);
     }
