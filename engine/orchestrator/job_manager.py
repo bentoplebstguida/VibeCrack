@@ -119,6 +119,20 @@ class JobManager:
         had_errors = False
 
         for module_name in self.modules:
+            # Check if scan was cancelled by the user
+            if self._is_cancelled():
+                logger.info("Scan %s was cancelled by user", self.scan_id)
+                firebase_client.add_scan_log(
+                    self.scan_id,
+                    level="info",
+                    message="Scan cancelado pelo usuario",
+                )
+                firebase_client.update_scan_status(
+                    self.scan_id, "cancelled", progress=self._progress(completed, total),
+                    current_phase="cancelled",
+                )
+                return
+
             try:
                 self._run_scanner(module_name, completed, total)
                 self.results[module_name] = "success"
@@ -180,6 +194,20 @@ class JobManager:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _is_cancelled(self) -> bool:
+        """Check Firestore if the scan status was set to 'cancelled'."""
+        try:
+            doc = firebase_client.db.collection("scans").document(self.scan_id).get()
+            if doc.exists:
+                return doc.to_dict().get("status") == "cancelled"
+        except Exception:
+            pass
+        return False
+
+    @staticmethod
+    def _progress(completed: int, total: int) -> int:
+        return min(int((completed / total) * 100), 95) if total else 0
 
     def _run_scanner(self, module_name: str, completed: int, total: int) -> None:
         """Dynamically import and run a single scanner module."""

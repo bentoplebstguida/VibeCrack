@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import type { Scan } from "@/lib/firestore";
-import { Loader2, CheckCircle, XCircle, Clock } from "lucide-react";
+import { cancelScan } from "@/lib/firestore";
+import { Loader2, CheckCircle, XCircle, Clock, Ban, StopCircle } from "lucide-react";
 
 const phaseLabels: Record<string, string> = {
   recon_scanner: "Reconhecimento",
@@ -22,30 +24,45 @@ const phaseLabels: Record<string, string> = {
 };
 
 export default function ScanProgress({ scan }: { scan: Scan }) {
+  const [cancelling, setCancelling] = useState(false);
+
   const statusConfig = {
     pending: {
       icon: <Clock className="w-5 h-5 text-yellow-500" />,
       label: "Aguardando",
-      color: "yellow",
     },
     running: {
       icon: <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />,
       label: "Em execucao",
-      color: "blue",
     },
     completed: {
       icon: <CheckCircle className="w-5 h-5 text-emerald-500" />,
       label: "Concluido",
-      color: "emerald",
     },
     failed: {
       icon: <XCircle className="w-5 h-5 text-red-500" />,
       label: "Falhou",
-      color: "red",
+    },
+    cancelled: {
+      icon: <Ban className="w-5 h-5 text-orange-500" />,
+      label: "Cancelado",
     },
   };
 
-  const config = statusConfig[scan.status];
+  const config = statusConfig[scan.status] || statusConfig.failed;
+  const canCancel = scan.status === "pending" || scan.status === "running";
+
+  const handleCancel = async () => {
+    if (!confirm("Tem certeza que quer parar este scan?")) return;
+    setCancelling(true);
+    try {
+      await cancelScan(scan.id);
+    } catch (err) {
+      console.error("Erro ao cancelar scan:", err);
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
@@ -55,9 +72,21 @@ export default function ScanProgress({ scan }: { scan: Scan }) {
           {config.icon}
           <span className="text-white font-medium">{config.label}</span>
         </div>
-        <span className="text-gray-400 text-sm">
-          {scan.progress}% completo
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-gray-400 text-sm">
+            {scan.progress}% completo
+          </span>
+          {canCancel && (
+            <button
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 text-red-400 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+            >
+              <StopCircle className="w-4 h-4" />
+              {cancelling ? "Parando..." : "Parar Scan"}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Progress Bar */}
@@ -68,6 +97,8 @@ export default function ScanProgress({ scan }: { scan: Scan }) {
               ? "bg-emerald-500"
               : scan.status === "failed"
               ? "bg-red-500"
+              : scan.status === "cancelled"
+              ? "bg-orange-500"
               : "bg-blue-500"
           }`}
           style={{ width: `${scan.progress}%` }}
@@ -81,6 +112,12 @@ export default function ScanProgress({ scan }: { scan: Scan }) {
           <span className="text-white">
             {phaseLabels[scan.currentPhase] || scan.currentPhase}
           </span>
+        </p>
+      )}
+
+      {scan.status === "cancelled" && (
+        <p className="text-sm text-orange-400">
+          Scan cancelado pelo usuario
         </p>
       )}
 

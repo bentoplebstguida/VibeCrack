@@ -94,7 +94,7 @@ class DirectoryScanner(BaseScanner):
                             "url": url,
                             "response_snippet": snippet[:200],
                         },
-                        remediation=self._get_remediation(path),
+                        remediation=self.get_remediation_with_code("directories", self._get_remediation(path)),
                         owasp_category="A01:2021 - Broken Access Control",
                         cvss_score=self._severity_to_cvss(severity),
                         affected_url=url,

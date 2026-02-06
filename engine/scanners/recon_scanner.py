@@ -10,6 +10,7 @@ from urllib.parse import urlparse, urljoin
 
 from bs4 import BeautifulSoup
 
+from engine.orchestrator import firebase_client
 from engine.scanners.base_scanner import BaseScanner
 
 
@@ -88,9 +89,14 @@ class ReconScanner(BaseScanner):
         path_tech = self._detect_from_paths()
         detected_tech.extend(path_tech)
 
-        # Log detected technologies
+        # Save detected technologies for other scanners
         unique_tech = list(set(detected_tech))
+        self.detected_tech = unique_tech
         if unique_tech:
+            try:
+                firebase_client.save_detected_tech(self.scan_id, unique_tech)
+            except Exception:
+                self.log("warning", "Could not save detected tech to Firestore")
             self.log("info", f"Detected technologies: {', '.join(unique_tech)}")
             self.add_finding(
                 severity="info",
@@ -223,7 +229,8 @@ class ReconScanner(BaseScanner):
                         "url": self.base_url,
                         "response_snippet": f"Cookie: {cookie.name}, Issues: {', '.join(issues)}",
                     },
-                    remediation="Configure cookies com: Secure (apenas HTTPS), HttpOnly (inacessivel por JS), SameSite=Strict ou Lax.",
+                    remediation=self.get_remediation_with_code("cookies",
+                        "Configure cookies com: Secure (apenas HTTPS), HttpOnly (inacessivel por JS), SameSite=Strict ou Lax."),
                     owasp_category="A05:2021 - Security Misconfiguration",
                     cvss_score=4.0,
                     affected_url=self.base_url,

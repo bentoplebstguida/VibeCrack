@@ -77,12 +77,15 @@ export function subscribeToProjects(
       ...doc.data(),
     })) as Project[];
     callback(projects);
+  }, (error) => {
+    console.error("Firestore projects listener error:", error);
+    callback([]);
   });
 }
 
 // ==================== SCANS ====================
 
-export type ScanStatus = "pending" | "running" | "completed" | "failed";
+export type ScanStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 export type ScanType = "full" | "quick" | "custom";
 export type ScanModule =
   | "recon"
@@ -119,6 +122,8 @@ export interface Scan {
   score: number | null;
   grade: string | null;
   summary: ScanSummary;
+  reportUrl: string | null;
+  detectedTech: string[];
   startedAt: Timestamp | null;
   completedAt: Timestamp | null;
   createdAt: Timestamp;
@@ -162,6 +167,12 @@ export async function startScan(
     createdAt: serverTimestamp(),
   });
   return docRef.id;
+}
+
+export async function cancelScan(scanId: string): Promise<void> {
+  await updateDoc(doc(db, "scans", scanId), {
+    status: "cancelled" as ScanStatus,
+  });
 }
 
 export function subscribeToScan(

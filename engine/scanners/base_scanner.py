@@ -115,6 +115,12 @@ class BaseScanner(ABC):
         # Circuit Breaker for Safe Mode (prevents accidental DoS)
         self._circuit_breaker = CircuitBreaker()
 
+        # Detected technologies (populated by recon scanner, shared via Firestore)
+        try:
+            self.detected_tech: list[str] = firebase_client.get_detected_tech(scan_id)
+        except Exception:
+            self.detected_tech = []
+
     # ------------------------------------------------------------------
     # Abstract interface
     # ------------------------------------------------------------------
@@ -227,6 +233,21 @@ class BaseScanner(ABC):
         except Exception:
             logger.exception("Failed to write finding to Firestore")
             return ""
+
+    def get_remediation_with_code(self, vuln_type: str, text_remediation: str) -> str:
+        """Enrich a text remediation with framework-specific code examples.
+
+        Combines the original remediation text with copy-paste ready code
+        from remediation_templates, based on the detected tech stack.
+        """
+        try:
+            from engine.scanners.remediation_templates import get_remediation_code
+            code = get_remediation_code(vuln_type, self.detected_tech)
+            if code:
+                return f"{text_remediation}\n\n--- CODIGO PARA CORRIGIR ---\n\n{code}"
+        except Exception:
+            pass
+        return text_remediation
 
     # ------------------------------------------------------------------
     # HTTP request helper

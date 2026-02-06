@@ -82,10 +82,11 @@ class SecretsScanner(BaseScanner):
                             "payload": masked,
                             "response_snippet": self._mask_context(context),
                         },
-                        remediation="1. Revogue o secret/token imediatamente.\n"
-                                    "2. Mova para variaveis de ambiente (process.env / .env).\n"
-                                    "3. Nunca inclua secrets no codigo frontend.\n"
-                                    "4. Use um gerenciador de secrets (Vault, AWS Secrets Manager, etc).",
+                        remediation=self.get_remediation_with_code("secrets",
+                            "1. Revogue o secret/token imediatamente.\n"
+                            "2. Mova para variaveis de ambiente (process.env / .env).\n"
+                            "3. Nunca inclua secrets no codigo frontend.\n"
+                            "4. Use um gerenciador de secrets (Vault, AWS Secrets Manager, etc)."),
                         owasp_category="A02:2021 - Cryptographic Failures",
                         cvss_score=8.5 if severity == "critical" else 6.5,
                         affected_url=source_url,

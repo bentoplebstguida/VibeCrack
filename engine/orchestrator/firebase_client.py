@@ -215,6 +215,29 @@ def add_scan_log(
 
 
 # ---------------------------------------------------------------------------
+# Detected technologies (shared between scanners)
+# ---------------------------------------------------------------------------
+
+
+def save_detected_tech(scan_id: str, tech_list: list[str]) -> None:
+    """Save detected technologies to the scan document so subsequent
+    scanners can use them for framework-specific remediation."""
+    _ensure_db()
+    db.collection("scans").document(scan_id).update({
+        "detectedTech": tech_list,
+    })
+
+
+def get_detected_tech(scan_id: str) -> list[str]:
+    """Load detected technologies from the scan document."""
+    _ensure_db()
+    doc = db.collection("scans").document(scan_id).get()
+    if doc.exists:
+        return doc.to_dict().get("detectedTech", [])
+    return []
+
+
+# ---------------------------------------------------------------------------
 # Internal utilities
 # ---------------------------------------------------------------------------
 

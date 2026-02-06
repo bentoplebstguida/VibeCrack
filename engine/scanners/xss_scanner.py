@@ -187,6 +187,12 @@ class XSSScanner(BaseScanner):
 
                 if self._payload_reflected(payload, resp.text):
                     snippet = self._extract_snippet(payload, resp.text)
+                    xss_remediation = self.get_remediation_with_code("xss",
+                        "1. Sanitize and escape all user input before rendering in HTML.\n"
+                        "2. Use a library like DOMPurify for client-side sanitization.\n"
+                        "3. Implement a strict Content-Security-Policy (CSP) header.\n"
+                        "4. Use context-aware output encoding (HTML entity, JS, URL encoding).\n"
+                        "5. Set HttpOnly and Secure flags on session cookies.")
                     self.add_finding(
                         severity="high",
                         title=f"Reflected XSS in form input '{target_input['name']}'",
@@ -202,13 +208,7 @@ class XSSScanner(BaseScanner):
                             "payload": payload,
                             "response_snippet": snippet,
                         },
-                        remediation=(
-                            "1. Sanitize and escape all user input before rendering in HTML.\n"
-                            "2. Use a library like DOMPurify for client-side sanitization.\n"
-                            "3. Implement a strict Content-Security-Policy (CSP) header.\n"
-                            "4. Use context-aware output encoding (HTML entity, JS, URL encoding).\n"
-                            "5. Set HttpOnly and Secure flags on session cookies."
-                        ),
+                        remediation=xss_remediation,
                         owasp_category="A03:2021 - Injection",
                         cvss_score=6.1,
                         affected_url=action_url,
@@ -256,6 +256,12 @@ class XSSScanner(BaseScanner):
 
                 if self._payload_reflected(payload, resp.text):
                     snippet = self._extract_snippet(payload, resp.text)
+                    xss_url_remediation = self.get_remediation_with_code("xss",
+                        "1. Sanitize and escape all user input before rendering in HTML.\n"
+                        "2. Use a library like DOMPurify for client-side sanitization.\n"
+                        "3. Implement a strict Content-Security-Policy (CSP) header.\n"
+                        "4. Use context-aware output encoding (HTML entity, JS, URL encoding).\n"
+                        "5. Set HttpOnly and Secure flags on session cookies.")
                     self.add_finding(
                         severity="high",
                         title=f"Reflected XSS via URL parameter '{param_name}'",
@@ -270,13 +276,7 @@ class XSSScanner(BaseScanner):
                             "payload": payload,
                             "response_snippet": snippet,
                         },
-                        remediation=(
-                            "1. Sanitize and escape all user input before rendering in HTML.\n"
-                            "2. Use a library like DOMPurify for client-side sanitization.\n"
-                            "3. Implement a strict Content-Security-Policy (CSP) header.\n"
-                            "4. Use context-aware output encoding (HTML entity, JS, URL encoding).\n"
-                            "5. Set HttpOnly and Secure flags on session cookies."
-                        ),
+                        remediation=xss_url_remediation,
                         owasp_category="A03:2021 - Injection",
                         cvss_score=6.1,
                         affected_url=test_url,

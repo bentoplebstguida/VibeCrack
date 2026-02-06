@@ -5,9 +5,10 @@ HackerPA Engine - Configuration
 import os
 
 # Firebase
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIREBASE_CREDENTIALS_PATH = os.environ.get(
     "FIREBASE_CREDENTIALS_PATH",
-    os.path.join(os.path.dirname(__file__), "serviceAccountKey.json")
+    os.path.join(_PROJECT_ROOT, "serviceAccountKey.json")
 )
 
 # Scan Settings

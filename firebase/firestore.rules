@@ -24,8 +24,9 @@ service cloud.firestore {
     match /scans/{scanId} {
       allow read: if isOwner(resource.data.userId);
       allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
-      // Engine updates scans via Admin SDK (bypasses rules)
-      allow update: if isOwner(resource.data.userId);
+      // Users can cancel their own scans; engine updates via Admin SDK
+      allow update: if isOwner(resource.data.userId)
+        && request.resource.data.status == 'cancelled';
       allow delete: if false; // Never delete scans from client
     }
 

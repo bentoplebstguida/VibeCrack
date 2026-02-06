@@ -30,10 +30,12 @@ SCANNER_CATEGORY_MAP = {
     "xss_scanner": "injection",
     "sqli_scanner": "injection",
     "csrf_scanner": "injection",
+    "ssrf_scanner": "injection",
     "secrets_scanner": "secrets_exposure",
     "directory_scanner": "configuration",
     "endpoint_scanner": "authentication",
     "recon_scanner": "information_disclosure",
+    "subdomain_scanner": "information_disclosure",
     "zap_scanner": "injection",
 }
 

@@ -179,13 +179,12 @@ class CSRFScanner(BaseScanner):
                     "payload": "N/A",
                     "response_snippet": f"Set-Cookie headers: {'; '.join(raw_cookies)[:300]}",
                 },
-                remediation=(
+                remediation=self.get_remediation_with_code("csrf",
                     "1. Set the SameSite attribute to 'Lax' (minimum) or 'Strict' "
                     "on all session/authentication cookies.\n"
                     "2. Example: Set-Cookie: session=abc; SameSite=Lax; Secure; HttpOnly\n"
                     "3. Note: SameSite=None requires the Secure flag and sends the "
-                    "cookie on all cross-site requests (no CSRF protection)."
-                ),
+                    "cookie on all cross-site requests (no CSRF protection)."),
                 owasp_category="A01:2021 - Broken Access Control",
                 cvss_score=5.4,
                 affected_url=self.base_url,
@@ -293,12 +292,11 @@ class CSRFScanner(BaseScanner):
                     "payload": "N/A",
                     "response_snippet": self._form_summary(form),
                 },
-                remediation=(
+                remediation=self.get_remediation_with_code("csrf",
                     "1. Add a hidden CSRF token to every state-changing form.\n"
                     "2. Validate the token server-side on every POST request.\n"
                     "3. Use framework-provided CSRF protection (e.g. Django "
-                    "{% csrf_token %}, Rails authenticity_token, Laravel @csrf)."
-                ),
+                    "{% csrf_token %}, Rails authenticity_token, Laravel @csrf)."),
                 owasp_category="A01:2021 - Broken Access Control",
                 cvss_score=4.3,
                 affected_url=action_url,
@@ -321,7 +319,7 @@ class CSRFScanner(BaseScanner):
                 "payload": "N/A",
                 "response_snippet": self._form_summary(form),
             },
-            remediation=(
+            remediation=self.get_remediation_with_code("csrf",
                 "1. Add a hidden CSRF token to every state-changing form and "
                 "validate it server-side on every POST request.\n"
                 "2. Use your framework's built-in CSRF protection:\n"
@@ -330,8 +328,7 @@ class CSRFScanner(BaseScanner):
                 "   - Laravel: @csrf directive in Blade templates\n"
                 "   - Express: csurf middleware\n"
                 "3. Set SameSite=Lax on session cookies as defense-in-depth.\n"
-                "4. Consider using the Double Submit Cookie pattern for APIs."
-            ),
+                "4. Consider using the Double Submit Cookie pattern for APIs."),
             owasp_category="A01:2021 - Broken Access Control",
             cvss_score=8.0,
             affected_url=action_url,

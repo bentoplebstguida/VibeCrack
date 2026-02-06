@@ -278,6 +278,14 @@ class SQLiScanner(BaseScanner):
             error_msg = self._find_sql_error(resp.text)
             if error_msg:
                 snippet = self._extract_snippet(error_msg, resp.text)
+                sqli_remediation = self.get_remediation_with_code("sqli",
+                    "1. Use parameterized queries / prepared statements -- never "
+                    "concatenate user input into SQL.\n"
+                    "2. Use an ORM (e.g. SQLAlchemy, Sequelize, ActiveRecord) "
+                    "which parameterizes by default.\n"
+                    "3. Apply the principle of least privilege to database accounts.\n"
+                    "4. Validate and sanitize all user-supplied input.\n"
+                    "5. Disable detailed error messages in production.")
                 self.add_finding(
                     severity="critical",
                     title=f"SQL Injection (error-based) in {label}",
@@ -293,15 +301,7 @@ class SQLiScanner(BaseScanner):
                         "payload": payload,
                         "response_snippet": snippet,
                     },
-                    remediation=(
-                        "1. Use parameterized queries / prepared statements -- never "
-                        "concatenate user input into SQL.\n"
-                        "2. Use an ORM (e.g. SQLAlchemy, Sequelize, ActiveRecord) "
-                        "which parameterizes by default.\n"
-                        "3. Apply the principle of least privilege to database accounts.\n"
-                        "4. Validate and sanitize all user-supplied input.\n"
-                        "5. Disable detailed error messages in production."
-                    ),
+                    remediation=sqli_remediation,
                     owasp_category="A03:2021 - Injection",
                     cvss_score=9.8,
                     affected_url=affected_url,
@@ -328,6 +328,12 @@ class SQLiScanner(BaseScanner):
             if len_true > 0 and len_false > 0:
                 diff_ratio = abs(len_true - len_false) / max(len_true, len_false)
                 if diff_ratio > self._BOOLEAN_LENGTH_THRESHOLD and resp_true.status_code == resp_false.status_code:
+                    sqli_bool_remediation = self.get_remediation_with_code("sqli",
+                        "1. Use parameterized queries / prepared statements -- never "
+                        "concatenate user input into SQL.\n"
+                        "2. Use an ORM which parameterizes by default.\n"
+                        "3. Apply the principle of least privilege to database accounts.\n"
+                        "4. Validate and sanitize all user-supplied input.")
                     self.add_finding(
                         severity="high",
                         title=f"SQL Injection (blind boolean-based) in {label}",
@@ -348,13 +354,7 @@ class SQLiScanner(BaseScanner):
                                 f"Difference ratio: {diff_ratio:.2%}"
                             ),
                         },
-                        remediation=(
-                            "1. Use parameterized queries / prepared statements -- never "
-                            "concatenate user input into SQL.\n"
-                            "2. Use an ORM which parameterizes by default.\n"
-                            "3. Apply the principle of least privilege to database accounts.\n"
-                            "4. Validate and sanitize all user-supplied input."
-                        ),
+                        remediation=sqli_bool_remediation,
                         owasp_category="A03:2021 - Injection",
                         cvss_score=8.6,
                         affected_url=affected_url,
@@ -375,6 +375,12 @@ class SQLiScanner(BaseScanner):
                 continue
 
             if elapsed >= min_delay:
+                sqli_time_remediation = self.get_remediation_with_code("sqli",
+                    "1. Use parameterized queries / prepared statements -- never "
+                    "concatenate user input into SQL.\n"
+                    "2. Use an ORM which parameterizes by default.\n"
+                    "3. Apply the principle of least privilege to database accounts.\n"
+                    "4. Validate and sanitize all user-supplied input.")
                 self.add_finding(
                     severity="high",
                     title=f"SQL Injection (time-based blind) in {label}",
@@ -393,13 +399,7 @@ class SQLiScanner(BaseScanner):
                             f"Injected delay: {min_delay:.0f}s."
                         ),
                     },
-                    remediation=(
-                        "1. Use parameterized queries / prepared statements -- never "
-                        "concatenate user input into SQL.\n"
-                        "2. Use an ORM which parameterizes by default.\n"
-                        "3. Apply the principle of least privilege to database accounts.\n"
-                        "4. Validate and sanitize all user-supplied input."
-                    ),
+                    remediation=sqli_time_remediation,
                     owasp_category="A03:2021 - Injection",
                     cvss_score=8.6,
                     affected_url=affected_url,

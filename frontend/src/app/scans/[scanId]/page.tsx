@@ -6,7 +6,7 @@ import ScanProgress from "@/components/scans/ScanProgress";
 import ScanSummary from "@/components/scans/ScanSummary";
 import VulnerabilityCard from "@/components/scans/VulnerabilityCard";
 import { useScan } from "@/hooks/useScan";
-import { ArrowLeft, Globe, Clock, ScrollText } from "lucide-react";
+import { ArrowLeft, Globe, Clock, ScrollText, FileDown, Cpu } from "lucide-react";
 import Link from "next/link";
 
 export default function ScanDetailPage() {
@@ -56,20 +56,47 @@ function ScanDetailContent() {
           Voltar
         </Link>
         <h1 className="text-2xl font-bold text-white">Detalhe do Scan</h1>
-        <div className="flex items-center gap-4 mt-2">
-          <div className="flex items-center gap-2 text-gray-400 text-sm">
-            <Globe className="w-4 h-4" />
-            {scan.domain}
+        <div className="flex items-center justify-between mt-2">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-gray-400 text-sm">
+              <Globe className="w-4 h-4" />
+              {scan.domain}
+            </div>
+            <div className="flex items-center gap-2 text-gray-500 text-sm">
+              <Clock className="w-4 h-4" />
+              {scan.scanType === "full"
+                ? "Scan Completo"
+                : scan.scanType === "quick"
+                ? "Scan Rapido"
+                : "Scan Custom"}
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-gray-500 text-sm">
-            <Clock className="w-4 h-4" />
-            {scan.scanType === "full"
-              ? "Scan Completo"
-              : scan.scanType === "quick"
-              ? "Scan Rapido"
-              : "Scan Custom"}
-          </div>
+          {scan.reportUrl && (
+            <a
+              href={scan.reportUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <FileDown className="w-4 h-4" />
+              Baixar Relatorio PDF
+            </a>
+          )}
         </div>
+        {/* Detected Technologies */}
+        {scan.detectedTech && scan.detectedTech.length > 0 && (
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+            <Cpu className="w-4 h-4 text-gray-500" />
+            {scan.detectedTech.map((tech) => (
+              <span
+                key={tech}
+                className="text-xs px-2 py-1 bg-gray-800 text-gray-400 rounded-md border border-gray-700"
+              >
+                {tech}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Progress */}
