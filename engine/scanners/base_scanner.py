@@ -121,6 +121,12 @@ class BaseScanner(ABC):
         except Exception:
             self.detected_tech = []
 
+        # Crawl data (populated by crawler, shared via Firestore)
+        try:
+            self.crawl_data: dict = firebase_client.get_crawl_data(scan_id)
+        except Exception:
+            self.crawl_data = {}
+
     # ------------------------------------------------------------------
     # Abstract interface
     # ------------------------------------------------------------------

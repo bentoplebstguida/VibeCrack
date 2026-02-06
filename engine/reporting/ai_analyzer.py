@@ -213,6 +213,16 @@ def _execute_proof(vuln: dict, domain: str) -> dict[str, str] | None:
         elif scanner == "subdomain_scanner":
             return _proof_subdomain(affected_url, title)
 
+        elif scanner == "access_control_scanner":
+            return _proof_endpoint(affected_url)
+
+        elif scanner == "xss_browser_scanner":
+            payload_url = evidence.get("url", affected_url) if isinstance(evidence, dict) else affected_url
+            return _proof_xss(payload_url, evidence)
+
+        elif scanner == "crawler":
+            return None  # Crawler only produces info findings
+
     except Exception as e:
         logger.debug("Proof execution failed for %s: %s", scanner, e)
         return None

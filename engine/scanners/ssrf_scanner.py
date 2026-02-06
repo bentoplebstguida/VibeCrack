@@ -5,9 +5,13 @@ Tests for Server-Side Request Forgery (SSRF) by attempting to make the
 target server fetch internal resources or callback URLs. Also checks for
 Remote Code Execution (RCE) indicators in error responses.
 
+Integrates with OASTClient for out-of-band blind SSRF detection when
+an external callback URL is configured via ``OAST_CALLBACK_URL``.
+
 Non-destructive: uses only read operations and timing analysis.
 """
 
+import logging
 import re
 import time
 from urllib.parse import urljoin, urlencode, urlparse, parse_qs, urlunparse
@@ -15,7 +19,9 @@ from urllib.parse import urljoin, urlencode, urlparse, parse_qs, urlunparse
 from bs4 import BeautifulSoup
 
 from engine.scanners.base_scanner import BaseScanner
+from engine.scanners.oast_client import OASTClient
 
+logger = logging.getLogger(__name__)
 
 # Internal IPs/URLs to test SSRF against
 SSRF_PAYLOADS = [
@@ -97,11 +103,23 @@ SSRF_EVIDENCE_PATTERNS = [
 class SSRFScanner(BaseScanner):
     scanner_name = "ssrf_scanner"
 
+    def __init__(self, scan_id: str, project_id: str, domain: str) -> None:
+        super().__init__(scan_id, project_id, domain)
+        # Initialise OAST client for blind SSRF detection
+        try:
+            self._oast = OASTClient(scan_id=scan_id)
+        except Exception as exc:
+            logger.warning("Could not initialise OASTClient: %s", exc)
+            self._oast = None
+
     def run(self) -> None:
         self.log("info", f"Testing SSRF/RCE for {self.base_url}")
 
-        # 1. Find URL parameters in the target
+        # 1. Capture a baseline response time for timing analysis
+        baseline_start = time.time()
         response = self.make_request(self.base_url)
+        self._baseline_time = time.time() - baseline_start
+
         if response is None:
             self.log("error", f"Could not reach {self.base_url}")
             return
@@ -110,15 +128,23 @@ class SSRFScanner(BaseScanner):
         injectable_points = self._find_injectable_points(response.text)
         self.log("info", f"Found {len(injectable_points)} potential SSRF injection points")
 
-        # 3. Test each point
+        # 3. Test each point with standard payloads
         for point in injectable_points:
             self._test_ssrf(point)
 
-        # 4. Test common API patterns for SSRF
+        # 4. Test each point with OAST-enhanced payloads (bypasses + callbacks)
+        if self._oast is not None:
+            self._test_oast_ssrf(injectable_points)
+
+        # 5. Test common API patterns for SSRF
         self._test_common_ssrf_endpoints()
 
-        # 5. Check for RCE indicators in error pages
+        # 6. Check for RCE indicators in error pages
         self._check_rce_indicators()
+
+        # 7. Check OAST callbacks for blind hits
+        if self._oast is not None:
+            self._check_oast_callbacks()
 
         self.log("info", "SSRF/RCE scan complete")
 
@@ -358,3 +384,199 @@ class SSRFScanner(BaseScanner):
                         affected_url=url,
                     )
                     return
+
+    # ------------------------------------------------------------------
+    # OAST-enhanced SSRF testing
+    # ------------------------------------------------------------------
+
+    def _test_oast_ssrf(self, injectable_points: list[dict]) -> None:
+        """Test injection points with OAST-enhanced payloads: advanced
+        bypass techniques, callback URLs, DNS canaries, and timing analysis."""
+        if self._oast is None:
+            return
+
+        oast_payloads = self._oast.get_ssrf_payloads()
+        self.log("info", f"Testing {len(oast_payloads)} OAST-enhanced SSRF payloads across {len(injectable_points)} injection point(s)")
+
+        for point in injectable_points:
+            url = point["url"]
+            param = point["param"]
+            method = point["method"]
+
+            # Test a limited set of the most impactful OAST payloads
+            # to keep request count reasonable
+            for payload_entry in oast_payloads[:15]:
+                payload_url = payload_entry["url"]
+                payload_tag = payload_entry["tag"]
+                payload_desc = payload_entry["description"]
+
+                # Send the payload
+                test_start = time.time()
+                if method == "GET":
+                    parsed = urlparse(url)
+                    params = parse_qs(parsed.query)
+                    params[param] = [payload_url]
+                    new_query = urlencode(params, doseq=True)
+                    test_url = urlunparse(parsed._replace(query=new_query))
+                    response = self.make_request(test_url, timeout=10)
+                else:
+                    data = {param: payload_url}
+                    response = self.make_request(url, method="POST", data=data, timeout=10)
+                test_time = time.time() - test_start
+
+                if response is None:
+                    continue
+
+                body = response.text
+
+                # 1. Analyse response for cloud metadata / file contents
+                analysis = self._oast.analyse_response(body, payload_tag=payload_tag)
+                if analysis["matched"]:
+                    severity = "critical" if analysis["category"] in (
+                        "aws_meta", "gcp_meta", "azure_meta", "file_read"
+                    ) else "high"
+
+                    self.add_finding(
+                        severity=severity,
+                        title=f"SSRF confirmado via bypass ({payload_desc}) no parametro '{param}'",
+                        description=(
+                            f"O servidor processou uma URL usando a tecnica de bypass '{payload_desc}' "
+                            f"fornecida no parametro '{param}'. A resposta contem evidencia de acesso a "
+                            f"recursos internos (categoria: {analysis['category']}). "
+                            f"Padroes encontrados: {', '.join(analysis['patterns'][:3])}."
+                        ),
+                        evidence={
+                            "url": url,
+                            "payload": f"{param}={payload_url}",
+                            "bypass_technique": payload_desc,
+                            "evidence_category": analysis["category"],
+                            "matched_patterns": analysis["patterns"][:5],
+                            "response_snippet": analysis["snippet"][:300],
+                        },
+                        remediation=(
+                            "1. NUNCA use input do usuario diretamente em requisicoes server-side.\n"
+                            "2. Implemente validacao rigorosa de URL: resolva o hostname para IP "
+                            "e verifique se e um IP privado ANTES de fazer a requisicao.\n"
+                            "3. Bloqueie esquemas perigosos: file://, gopher://, dict://, ftp://.\n"
+                            "4. Use allowlists de dominios/IPs ao inves de blocklists.\n"
+                            "5. Desabilite redirecionamentos em requisicoes server-side.\n"
+                            "6. Bloqueie metadados de cloud (169.254.169.254) no firewall/rede.\n"
+                            "7. Migre para IMDSv2 (AWS) que requer token de sessao."
+                        ),
+                        owasp_category="A10:2021 - Server-Side Request Forgery",
+                        cvss_score=9.8 if severity == "critical" else 8.0,
+                        affected_url=url,
+                    )
+                    return  # Critical found on this point, move on
+
+                # 2. Check standard RCE/SSRF evidence patterns
+                for pattern in RCE_INDICATORS + SSRF_EVIDENCE_PATTERNS:
+                    if re.search(pattern, body, re.IGNORECASE):
+                        self.add_finding(
+                            severity="high",
+                            title=f"SSRF detectado via bypass ({payload_desc}) no parametro '{param}'",
+                            description=(
+                                f"O servidor tentou processar a URL usando a tecnica '{payload_desc}' "
+                                f"no parametro '{param}'. A resposta contem indicadores de que o servidor "
+                                f"fez uma requisicao interna."
+                            ),
+                            evidence={
+                                "url": url,
+                                "payload": f"{param}={payload_url}",
+                                "bypass_technique": payload_desc,
+                                "response_snippet": body[:300],
+                            },
+                            remediation=(
+                                "1. Valide e sanitize todas as URLs fornecidas pelo usuario.\n"
+                                "2. Resolva hostnames para IP e bloqueie ranges privados.\n"
+                                "3. Bloqueie esquemas perigosos (file://, gopher://, dict://).\n"
+                                "4. Nao exponha mensagens de erro internas ao usuario."
+                            ),
+                            owasp_category="A10:2021 - Server-Side Request Forgery",
+                            cvss_score=7.5,
+                            affected_url=url,
+                        )
+                        break
+
+                # 3. Timing-based blind SSRF detection
+                timing = self._oast.analyse_timing(self._baseline_time, test_time)
+                if timing["suspicious"]:
+                    self.add_finding(
+                        severity="medium",
+                        title=f"Possivel blind SSRF via timing no parametro '{param}'",
+                        description=(
+                            f"O tempo de resposta para o parametro '{param}' com payload "
+                            f"'{payload_desc}' foi {timing['factor']}x mais lento que o baseline "
+                            f"({timing['baseline_ms']}ms vs {timing['test_ms']}ms). "
+                            f"Isso pode indicar que o servidor esta tentando buscar a URL internamente."
+                        ),
+                        evidence={
+                            "url": url,
+                            "payload": f"{param}={payload_url}",
+                            "bypass_technique": payload_desc,
+                            "baseline_ms": timing["baseline_ms"],
+                            "test_ms": timing["test_ms"],
+                            "slowdown_factor": timing["factor"],
+                        },
+                        remediation=(
+                            "1. Investigue se o servidor faz requisicoes externas com base em input do usuario.\n"
+                            "2. Implemente timeouts curtos para requisicoes server-side (max 3 segundos).\n"
+                            "3. Use allowlists de dominios e bloqueie IPs privados.\n"
+                            "4. Considere usar um proxy de saida (egress proxy) com regras de firewall."
+                        ),
+                        owasp_category="A10:2021 - Server-Side Request Forgery",
+                        cvss_score=5.0,
+                        affected_url=url,
+                    )
+
+    def _check_oast_callbacks(self) -> None:
+        """Poll the OAST callback service for any hits received during
+        the scan.  Each hit confirms a blind SSRF vulnerability."""
+        if self._oast is None:
+            return
+
+        self.log("info", "Checking OAST callbacks for blind SSRF hits")
+
+        # Brief delay to allow outbound requests to arrive
+        time.sleep(2)
+
+        try:
+            hits = self._oast.check_callbacks()
+        except Exception as exc:
+            self.log("warning", f"Error checking OAST callbacks: {exc}")
+            return
+
+        for hit in hits:
+            tag = hit.get("tag", "unknown")
+            token = hit.get("token", "")
+            source_ip = hit.get("source_ip", "unknown")
+
+            self.add_finding(
+                severity="critical",
+                title=f"Blind SSRF confirmado via OAST callback (tag: {tag})",
+                description=(
+                    f"O servidor alvo fez uma requisicao outbound para o endpoint OAST, "
+                    f"confirmando uma vulnerabilidade de blind SSRF. O callback foi recebido "
+                    f"com o token '{token}' (tag: {tag}) originado do IP {source_ip}. "
+                    f"Isso significa que um atacante pode fazer o servidor buscar URLs arbitrarias, "
+                    f"potencialmente acessando recursos internos da rede."
+                ),
+                evidence={
+                    "oast_tag": tag,
+                    "oast_token": token,
+                    "source_ip": source_ip,
+                    "timestamp": hit.get("timestamp", ""),
+                    "confirmation": "Out-of-band callback received at OAST endpoint",
+                },
+                remediation=(
+                    "1. CRITICO: O servidor esta fazendo requisicoes externas com base em input do usuario.\n"
+                    "2. Implemente validacao rigorosa de URL no server-side.\n"
+                    "3. Bloqueie todas as requisicoes outbound desnecessarias no firewall.\n"
+                    "4. Use allowlists de dominios e bloqueie ranges de IP privados.\n"
+                    "5. Desabilite esquemas perigosos (file://, gopher://, dict://).\n"
+                    "6. Migre para IMDSv2 (AWS) e configure firewall para bloquear 169.254.169.254."
+                ),
+                owasp_category="A10:2021 - Server-Side Request Forgery",
+                cvss_score=9.8,
+                affected_url=self.base_url,
+            )

@@ -48,14 +48,40 @@ ZAP_CONFIDENCE_MAP = {
 class ZAPScanner(BaseScanner):
     """OWASP ZAP integration scanner.
 
-    Connects to ZAP's REST API to run a spider + active scan against
-    the target, then imports all alerts as HackerPA findings.
+    By default runs passive scan only (spider + passive analysis).
+    Active scanning is only performed when explicitly requested via
+    the scan options (``zapActiveScan: true`` in the Firestore scan
+    document or ``active_scan=True`` constructor parameter).  This
+    makes ZAP safe to include in every scan without risking
+    destructive active-scan payloads.
     """
 
     scanner_name = "zap_scanner"
 
+    def __init__(self, scan_id: str, project_id: str, domain: str) -> None:
+        super().__init__(scan_id, project_id, domain)
+
+        # Determine whether active scanning is explicitly requested.
+        # Check the scan document options stored in crawl_data or scan
+        # options that the orchestrator may have set.
+        self._active_scan_enabled: bool = False
+        try:
+            from engine.orchestrator import firebase_client as _fb
+            _fb._ensure_db()
+            doc = _fb.db.collection("scans").document(scan_id).get()
+            if doc.exists:
+                scan_opts = doc.to_dict()
+                # Support either top-level flag or nested options dict
+                self._active_scan_enabled = bool(
+                    scan_opts.get("zapActiveScan", False)
+                    or scan_opts.get("options", {}).get("zapActiveScan", False)
+                )
+        except Exception:
+            self._active_scan_enabled = False
+
     def run(self) -> None:
-        self.log("info", f"Starting OWASP ZAP scan for {self.base_url}")
+        scan_mode = "active + passive" if self._active_scan_enabled else "passive only"
+        self.log("info", f"Starting OWASP ZAP scan for {self.base_url} (mode: {scan_mode})")
 
         # Check if ZAP is reachable
         if not self._is_zap_available():
@@ -76,19 +102,22 @@ class ZAPScanner(BaseScanner):
             self._run_spider()
 
             # 2. Run passive scan (happens automatically during spider)
-            self.log("info", "Phase 2: Passive scan running")
+            self.log("info", "Phase 2: Waiting for passive scan to complete")
             self._wait_for_passive_scan()
 
-            # 3. Run active scan
-            self.log("info", "Phase 3: Active scan starting")
-            self._run_active_scan()
+            # 3. Active scan - only if explicitly requested
+            if self._active_scan_enabled:
+                self.log("info", "Phase 3: Active scan starting (explicitly requested)")
+                self._run_active_scan()
+            else:
+                self.log("info", "Phase 3: Active scan SKIPPED (passive-only mode, set zapActiveScan=true to enable)")
 
             # 4. Get and import alerts
             self.log("info", "Phase 4: Importing ZAP findings")
             alerts = self._get_alerts()
             self._import_alerts(alerts)
 
-            self.log("info", f"ZAP scan complete. Imported {len(alerts)} alert(s).")
+            self.log("info", f"ZAP scan complete ({scan_mode}). Imported {len(alerts)} alert(s).")
 
         except Exception as e:
             self.log("error", f"ZAP scan failed: {e}")

@@ -66,6 +66,18 @@ SCANNER_REGISTRY: dict[str, dict[str, str]] = {
         "module": "engine.scanners.zap_scanner",
         "class": "ZAPScanner",
     },
+    "crawler": {
+        "module": "engine.scanners.crawler",
+        "class": "CrawlerScanner",
+    },
+    "access_control": {
+        "module": "engine.scanners.access_control_scanner",
+        "class": "AccessControlScanner",
+    },
+    "xss_browser": {
+        "module": "engine.scanners.xss_browser_scanner",
+        "class": "XSSBrowserScanner",
+    },
 }
 
 

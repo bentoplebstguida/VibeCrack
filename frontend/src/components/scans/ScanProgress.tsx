@@ -6,6 +6,8 @@ import { cancelScan } from "@/lib/firestore";
 import { Loader2, CheckCircle, XCircle, Clock, Ban, StopCircle } from "lucide-react";
 
 const phaseLabels: Record<string, string> = {
+  crawler: "Mapeando Site",
+  crawler_scanner: "Mapeando Site",
   recon_scanner: "Reconhecimento",
   subdomain_scanner: "Subdominios",
   ssl_scanner: "SSL/TLS",
@@ -17,6 +19,10 @@ const phaseLabels: Record<string, string> = {
   csrf_scanner: "CSRF",
   ssrf_scanner: "SSRF / RCE",
   endpoint_scanner: "Endpoints de API",
+  access_control: "Controle de Acesso",
+  access_control_scanner: "Controle de Acesso",
+  xss_browser: "XSS (Browser)",
+  xss_browser_scanner: "XSS (Browser)",
   zap_scanner: "OWASP ZAP Scan",
   initializing: "Inicializando",
   scoring: "Calculando Score",

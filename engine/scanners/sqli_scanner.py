@@ -10,6 +10,7 @@ NON-DESTRUCTIVE: Only attempts to prove injection is possible.  Never
 drops, deletes, or modifies data on the target.
 """
 
+import json
 import re
 import time
 from html.parser import HTMLParser
@@ -77,6 +78,16 @@ _TIME_PAYLOADS: list[tuple[str, float]] = [
     ("'; SELECT pg_sleep(5);--", 4.0),
 ]
 
+# Headers commonly processed by backend systems and potentially injectable
+_INJECTABLE_HEADERS: list[str] = [
+    "User-Agent",
+    "Referer",
+    "X-Forwarded-For",
+    "X-Forwarded-Host",
+    "X-Client-IP",
+    "X-Real-IP",
+]
+
 
 class _FormParser(HTMLParser):
     """Extracts <form> elements and their <input>/<textarea>/<select> children."""
@@ -134,6 +145,9 @@ class SQLiScanner(BaseScanner):
         # Gather a baseline response length for the homepage
         self._baseline_length = len(response.text)
 
+        # Store the initial response for cookie injection testing
+        self._initial_response = response
+
         # 1. Extract forms
         forms = self._extract_forms(response.text, self.base_url)
         self.log("info", f"Found {len(forms)} form(s) on {self.base_url}")
@@ -147,6 +161,15 @@ class SQLiScanner(BaseScanner):
 
         for url in urls:
             self._test_url_params(url)
+
+        # 3. Test JSON body injection on API endpoints from crawler
+        self._test_json_injection()
+
+        # 4. Test injectable headers on the base URL
+        self._test_header_injection()
+
+        # 5. Test cookie injection using cookies set by the target
+        self._test_cookie_injection()
 
         self.log("info", "SQL injection scan complete")
 
@@ -253,6 +276,126 @@ class SQLiScanner(BaseScanner):
             )
 
     # ------------------------------------------------------------------
+    # JSON body injection (API endpoints)
+    # ------------------------------------------------------------------
+
+    def _test_json_injection(self) -> None:
+        """Test SQL injection via JSON request bodies on API endpoints
+        discovered by the crawler."""
+        api_endpoints = self.crawl_data.get("apiEndpoints", [])
+        if not api_endpoints:
+            self.log("info", "No API endpoints from crawler - skipping JSON body injection")
+            return
+
+        self.log("info", f"Testing JSON body injection on {len(api_endpoints)} API endpoint(s)")
+
+        # Default JSON body to inject into when we don't know the schema.
+        # Each key is tested individually while other keys keep safe values.
+        _DEFAULT_JSON_BODY: dict[str, str] = {
+            "username": "test",
+            "password": "test",
+            "email": "test@test.com",
+            "id": "1",
+            "query": "test",
+            "search": "test",
+            "name": "test",
+        }
+
+        for endpoint in api_endpoints:
+            try:
+                # Try to get the original endpoint schema by sending a benign request
+                probe_resp = self.make_request(endpoint, method="POST",
+                                               headers={"Content-Type": "application/json"},
+                                               data=json.dumps(_DEFAULT_JSON_BODY))
+
+                # Use the default body as our injection template
+                json_body = _DEFAULT_JSON_BODY.copy()
+
+                for param_name in json_body:
+                    def build_request(payload: str, _pn=param_name, _body=json_body, _ep=endpoint):
+                        injected = _body.copy()
+                        injected[_pn] = payload
+                        return _ep, "POST", json.dumps(injected)
+
+                    self._test_injection_point(
+                        label=f"JSON parameter '{param_name}' on {endpoint}",
+                        build_request=build_request,
+                        affected_url=endpoint,
+                        extra_headers={"Content-Type": "application/json"},
+                    )
+            except Exception as exc:
+                self.log("warning", f"Error testing JSON injection on {endpoint}: {exc}")
+
+    # ------------------------------------------------------------------
+    # Header injection
+    # ------------------------------------------------------------------
+
+    def _test_header_injection(self) -> None:
+        """Test SQL injection via common HTTP headers on the base URL."""
+        self.log("info", f"Testing header injection on {self.base_url}")
+
+        for header_name in _INJECTABLE_HEADERS:
+            try:
+                self._test_injection_point(
+                    label=f"HTTP header '{header_name}'",
+                    build_request=lambda payload, _hn=header_name: (
+                        self.base_url, "GET", None
+                    ),
+                    affected_url=self.base_url,
+                    extra_headers_fn=lambda payload, _hn=header_name: {_hn: payload},
+                )
+            except Exception as exc:
+                self.log("warning", f"Error testing header injection ({header_name}): {exc}")
+
+    # ------------------------------------------------------------------
+    # Cookie injection
+    # ------------------------------------------------------------------
+
+    def _test_cookie_injection(self) -> None:
+        """Test SQL injection via cookie values set by the target."""
+        # Collect cookies from the initial response and session jar
+        cookies: dict[str, str] = {}
+
+        try:
+            if hasattr(self, "_initial_response") and self._initial_response is not None:
+                for cookie_name, cookie_value in self._initial_response.cookies.items():
+                    cookies[cookie_name] = cookie_value
+        except Exception:
+            pass
+
+        # Also grab any cookies accumulated by the session
+        try:
+            for cookie in self._session.cookies:
+                cookies[cookie.name] = cookie.value
+        except Exception:
+            pass
+
+        if not cookies:
+            self.log("info", "No cookies set by target - skipping cookie injection")
+            return
+
+        self.log("info", f"Testing cookie injection on {len(cookies)} cookie(s)")
+
+        for cookie_name in cookies:
+            try:
+                def build_request(payload: str, _cn=cookie_name, _cookies=cookies):
+                    return self.base_url, "GET", None
+
+                self._test_injection_point(
+                    label=f"cookie '{cookie_name}'",
+                    build_request=build_request,
+                    affected_url=self.base_url,
+                    extra_headers_fn=lambda payload, _cn=cookie_name, _cookies=cookies: {
+                        "Cookie": "; ".join(
+                            f"{k}={payload if k == _cn else v}"
+                            for k, v in _cookies.items()
+                        )
+                    },
+                )
+            except Exception as exc:
+                self.log("warning", f"Error testing cookie injection ({cookie_name}): {exc}")
+
+    # ------------------------------------------------------------------
     # Core injection test (combines all three techniques)
     # ------------------------------------------------------------------
 
@@ -261,17 +404,35 @@ class SQLiScanner(BaseScanner):
         label: str,
         build_request,
         affected_url: str,
+        extra_headers: Optional[dict[str, str]] = None,
+        extra_headers_fn=None,
     ) -> None:
         """Run all three detection techniques against a single injection
         point identified by *label*.
 
         ``build_request`` is a callable that takes a payload string and
         returns ``(url, method, data_or_none)``.
+
+        ``extra_headers`` is an optional dict of extra HTTP headers to send
+        with every request (e.g. Content-Type for JSON bodies).
+
+        ``extra_headers_fn`` is an optional callable that takes a payload
+        string and returns a dict of headers.  Used for header-injection
+        and cookie-injection where the header value itself contains the
+        payload.  When both are supplied they are merged (fn takes precedence).
         """
+        def _resolve_headers(payload: str) -> Optional[dict[str, str]]:
+            headers: dict[str, str] = {}
+            if extra_headers:
+                headers.update(extra_headers)
+            if extra_headers_fn:
+                headers.update(extra_headers_fn(payload))
+            return headers or None
+
         # ----- 1. Error-based detection ---------------------------------
         for payload in _SAFE_ERROR_PAYLOADS:
             url, method, data = build_request(payload)
-            resp = self.make_request(url, method=method, data=data)
+            resp = self.make_request(url, method=method, data=data, headers=_resolve_headers(payload))
             if resp is None:
                 continue
 
@@ -311,12 +472,12 @@ class SQLiScanner(BaseScanner):
         # ----- 2. Blind boolean-based detection -------------------------
         for true_payload, false_payload in _BOOLEAN_PAIRS:
             url_t, method_t, data_t = build_request(true_payload)
-            resp_true = self.make_request(url_t, method=method_t, data=data_t)
+            resp_true = self.make_request(url_t, method=method_t, data=data_t, headers=_resolve_headers(true_payload))
             if resp_true is None:
                 continue
 
             url_f, method_f, data_f = build_request(false_payload)
-            resp_false = self.make_request(url_f, method=method_f, data=data_f)
+            resp_false = self.make_request(url_f, method=method_f, data=data_f, headers=_resolve_headers(false_payload))
             if resp_false is None:
                 continue
 
@@ -366,7 +527,7 @@ class SQLiScanner(BaseScanner):
             url, method, data = build_request(payload)
 
             start = time.time()
-            resp = self.make_request(url, method=method, data=data, timeout=15)
+            resp = self.make_request(url, method=method, data=data, headers=_resolve_headers(payload), timeout=15)
             elapsed = time.time() - start
 
             if resp is None:

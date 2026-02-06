@@ -17,8 +17,23 @@ from engine import config
 class SecretsScanner(BaseScanner):
     scanner_name = "secrets_scanner"
 
+    # Patterns that indicate webpack/vite chunk references inside JS bundles
+    _CHUNK_PATTERNS: list[re.Pattern] = [
+        # Webpack: "/static/js/chunk-" or "static/js/" followed by chunk id
+        re.compile(r'["\'](/static/js/[^"\']+\.js)["\']'),
+        # Next.js: "/_next/static/chunks/"
+        re.compile(r'["\'](/_next/static/chunks/[^"\']+\.js)["\']'),
+        # Vite: "/assets/" chunk references
+        re.compile(r'["\'](/assets/[^"\']+\.js)["\']'),
+        # Generic chunk patterns with hash
+        re.compile(r'["\']([^"\']*chunk[^"\']*\.js)["\']'),
+    ]
+
     def run(self) -> None:
         self.log("info", f"Scanning frontend for exposed secrets: {self.base_url}")
+
+        # Track all JS URLs we've already scanned to avoid duplicates
+        scanned_js: set[str] = set()
 
         # Fetch main page
         response = self.make_request(self.base_url)
@@ -29,15 +44,57 @@ class SecretsScanner(BaseScanner):
         # Scan the main HTML
         self._scan_content(response.text, self.base_url)
 
+        # Scan inline <script> tag contents from the HTML page
+        self._scan_inline_scripts(response.text, self.base_url)
+
         # Find and scan linked JavaScript files
         js_urls = self._extract_js_urls(response.text)
         self.log("info", f"Found {len(js_urls)} JavaScript files to scan")
 
+        # Also include JS files discovered by the crawler
+        crawl_js_files = self.crawl_data.get("jsFiles", [])
+        if crawl_js_files:
+            self.log("info", f"Adding {len(crawl_js_files)} JS files from crawler data")
+            for crawl_js in crawl_js_files:
+                if crawl_js not in js_urls:
+                    js_urls.append(crawl_js)
+
+        # Collect chunk URLs discovered inside JS bundles for a second pass
+        discovered_chunks: list[str] = []
+
         for js_url in js_urls:
             full_url = urljoin(self.base_url, js_url)
+            if full_url in scanned_js:
+                continue
+            scanned_js.add(full_url)
+
             js_response = self.make_request(full_url)
             if js_response and js_response.status_code == 200:
                 self._scan_content(js_response.text, full_url)
+
+                # Discover webpack/vite chunk references inside this JS file
+                chunks = self._discover_chunks(js_response.text, full_url)
+                discovered_chunks.extend(chunks)
+
+                # Try fetching the source map for this JS file
+                self._scan_source_map(full_url)
+
+        # Second pass: scan discovered chunk files
+        if discovered_chunks:
+            self.log("info", f"Discovered {len(discovered_chunks)} JS chunk file(s) to scan")
+        for chunk_url in discovered_chunks:
+            if chunk_url in scanned_js:
+                continue
+            scanned_js.add(chunk_url)
+
+            try:
+                chunk_response = self.make_request(chunk_url)
+                if chunk_response and chunk_response.status_code == 200:
+                    self._scan_content(chunk_response.text, chunk_url)
+                    # Also check source maps for chunk files
+                    self._scan_source_map(chunk_url)
+            except Exception as exc:
+                self.log("warning", f"Error scanning chunk {chunk_url}: {exc}")
 
         self.log("info", "Secrets scan complete")
 
@@ -53,6 +110,74 @@ class SecretsScanner(BaseScanner):
         except Exception as e:
             self.log("warning", f"Error parsing HTML for scripts: {e}")
         return urls
+
+    def _scan_inline_scripts(self, html: str, page_url: str) -> None:
+        """Extract and scan the contents of inline <script> tags."""
+        try:
+            soup = BeautifulSoup(html, "lxml")
+            inline_scripts = soup.find_all("script", src=False)
+            count = 0
+            for script in inline_scripts:
+                script_text = script.get_text(strip=True)
+                if script_text and len(script_text) > 10:
+                    self._scan_content(script_text, f"{page_url} (inline script)")
+                    count += 1
+            if count:
+                self.log("info", f"Scanned {count} inline script(s) from {page_url}")
+        except Exception as exc:
+            self.log("warning", f"Error extracting inline scripts: {exc}")
+
+    def _discover_chunks(self, js_content: str, source_url: str) -> list[str]:
+        """Look for webpack/vite chunk file references inside a JS bundle
+        and return their full URLs."""
+        chunks: list[str] = []
+        seen: set[str] = set()
+
+        for pattern in self._CHUNK_PATTERNS:
+            try:
+                for match in pattern.finditer(js_content):
+                    chunk_path = match.group(1)
+                    full_url = urljoin(self.base_url, chunk_path)
+                    if full_url not in seen:
+                        seen.add(full_url)
+                        chunks.append(full_url)
+            except Exception:
+                continue
+
+        if chunks:
+            self.log("info", f"Found {len(chunks)} chunk reference(s) in {source_url}")
+        return chunks
+
+    def _scan_source_map(self, js_url: str) -> None:
+        """Try fetching ``{js_url}.map`` and scan it for secrets.
+
+        Source maps often contain the original source code which may
+        include hardcoded secrets that were minified away in the bundle.
+        """
+        map_url = f"{js_url}.map"
+        try:
+            map_response = self.make_request(map_url)
+            if map_response is None:
+                return
+
+            # Source maps return 200 with JSON content when they exist.
+            # Many servers return 404 or non-JSON; skip those.
+            if map_response.status_code != 200:
+                return
+
+            content_type = map_response.headers.get("Content-Type", "")
+            # Accept JSON or octet-stream (some servers misconfigure MIME)
+            if "json" not in content_type and "javascript" not in content_type and "octet" not in content_type and "text" not in content_type:
+                return
+
+            # Source map is valid - this is already a finding by itself
+            self.log("info", f"Source map found: {map_url}")
+
+            # Scan the raw source map text for secrets
+            self._scan_content(map_response.text, map_url)
+
+        except Exception as exc:
+            self.log("warning", f"Error checking source map {map_url}: {exc}")
 
     def _scan_content(self, content: str, source_url: str) -> None:
         """Scan text content for secret patterns."""

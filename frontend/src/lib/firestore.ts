@@ -88,6 +88,7 @@ export function subscribeToProjects(
 export type ScanStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 export type ScanType = "full" | "quick" | "custom";
 export type ScanModule =
+  | "crawler"
   | "recon"
   | "subdomains"
   | "ssl"
@@ -99,6 +100,8 @@ export type ScanModule =
   | "secrets"
   | "directories"
   | "endpoints"
+  | "access_control"
+  | "xss_browser"
   | "zap";
 
 export interface ScanSummary {
@@ -132,6 +135,7 @@ export interface Scan {
 }
 
 const ALL_MODULES: ScanModule[] = [
+  "crawler",
   "recon",
   "subdomains",
   "ssl",
@@ -143,6 +147,9 @@ const ALL_MODULES: ScanModule[] = [
   "csrf",
   "ssrf",
   "endpoints",
+  "access_control",
+  "xss_browser",
+  "zap",
 ];
 
 export async function startScan(

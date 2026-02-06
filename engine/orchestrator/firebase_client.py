@@ -237,6 +237,15 @@ def get_detected_tech(scan_id: str) -> list[str]:
     return []
 
 
+def get_crawl_data(scan_id: str) -> dict:
+    """Load crawl data from a scan document."""
+    _ensure_db()
+    doc = db.collection("scans").document(scan_id).get()
+    if doc.exists:
+        return doc.to_dict().get("crawlData", {})
+    return {}
+
+
 # ---------------------------------------------------------------------------
 # Internal utilities
 # ---------------------------------------------------------------------------

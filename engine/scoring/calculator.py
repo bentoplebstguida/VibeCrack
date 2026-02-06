@@ -37,6 +37,9 @@ SCANNER_CATEGORY_MAP = {
     "recon_scanner": "information_disclosure",
     "subdomain_scanner": "information_disclosure",
     "zap_scanner": "injection",
+    "crawler": "information_disclosure",
+    "access_control_scanner": "authentication",
+    "xss_browser_scanner": "injection",
 }
 
 # Category weights (must sum to 100)
