@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  # ---- HackerPA Scan Engine ----
+  engine:
+    build:
+      context: ../../            # repo root (so COPY engine/ works)
+      dockerfile: engine/docker/Dockerfile.engine
+    container_name: hackerpa-engine
+    restart: unless-stopped
+    environment:
+      - FIREBASE_CREDENTIALS_PATH=/app/secrets/serviceAccountKey.json
+      - LOG_LEVEL=INFO
+      - SCAN_TIMEOUT=300
+      - MAX_CONCURRENT_SCANS=3
+      - REQUEST_DELAY=0.5
+    volumes:
+      - ../../serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    depends_on:
+      - zap
+    networks:
+      - hackerpa
+
+  # ---- OWASP ZAP (Zed Attack Proxy) ----
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    container_name: hackerpa-zap
+    restart: unless-stopped
+    command: >
+      zap.sh -daemon
+      -host 0.0.0.0
+      -port 8080
+      -config api.disablekey=true
+      -config api.addrs.addr.name=.*
+      -config api.addrs.addr.regex=true
+    ports:
+      - "8080:8080"
+    networks:
+      - hackerpa
+
+networks:
+  hackerpa:
+    driver: bridge

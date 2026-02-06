@@ -1,0 +1,9 @@
+firebase-admin==6.4.0
+requests==2.31.0
+beautifulsoup4==4.12.3
+sslyze==6.0.0
+reportlab==4.1.0
+python-owasp-zap-v2.4==0.0.22
+docker==7.0.0
+lxml==5.1.0
+urllib3==2.2.0
