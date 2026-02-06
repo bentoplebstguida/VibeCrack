@@ -124,6 +124,8 @@ export interface Scan {
   summary: ScanSummary;
   reportUrl: string | null;
   detectedTech: string[];
+  aiSummary: string | null;
+  exploitPlaybook: string | null;
   startedAt: Timestamp | null;
   completedAt: Timestamp | null;
   createdAt: Timestamp;
@@ -162,6 +164,8 @@ export async function startScan(
     score: null,
     grade: null,
     summary: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+    aiSummary: null,
+    exploitPlaybook: null,
     startedAt: null,
     completedAt: null,
     createdAt: serverTimestamp(),

@@ -20,6 +20,8 @@ const phaseLabels: Record<string, string> = {
   zap_scanner: "OWASP ZAP Scan",
   initializing: "Inicializando",
   scoring: "Calculando Score",
+  reporting: "Gerando Relatorio PDF",
+  ai_analysis: "Analisando com IA",
   done: "Finalizado",
 };
 

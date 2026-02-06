@@ -4,6 +4,8 @@ import { useParams } from "next/navigation";
 import AuthGuard from "@/components/ui/AuthGuard";
 import ScanProgress from "@/components/scans/ScanProgress";
 import ScanSummary from "@/components/scans/ScanSummary";
+import AiSummarySection from "@/components/scans/AiSummarySection";
+import ExploitPlaybookSection from "@/components/scans/ExploitPlaybookSection";
 import VulnerabilityCard from "@/components/scans/VulnerabilityCard";
 import { useScan } from "@/hooks/useScan";
 import { ArrowLeft, Globe, Clock, ScrollText, FileDown, Cpu } from "lucide-react";
@@ -108,6 +110,20 @@ function ScanDetailContent() {
       <div className="mb-6">
         <ScanSummary scan={scan} />
       </div>
+
+      {/* AI Analysis */}
+      {scan.aiSummary && (
+        <div className="mb-6">
+          <AiSummarySection scan={scan} />
+        </div>
+      )}
+
+      {/* Exploit Playbook */}
+      {scan.exploitPlaybook && (
+        <div className="mb-6">
+          <ExploitPlaybookSection scan={scan} />
+        </div>
+      )}
 
       {/* Vulnerabilities */}
       {vulnerabilities.length > 0 && (

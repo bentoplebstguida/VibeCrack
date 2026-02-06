@@ -7,3 +7,4 @@ python-owasp-zap-v2.4==0.0.22
 docker==7.0.0
 lxml==5.1.0
 urllib3==2.2.0
+anthropic>=0.78.0

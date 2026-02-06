@@ -5,7 +5,9 @@ Discovers subdomains that may be forgotten or misconfigured (dev, staging,
 test environments) using DNS brute-forcing and certificate transparency logs.
 """
 
+import random
 import socket
+import string
 from urllib.parse import urlparse
 
 import requests
@@ -58,11 +60,32 @@ class SubdomainScanner(BaseScanner):
 
         self.log("info", f"Discovering subdomains for {base_domain}")
 
+        # Detect wildcard DNS before brute-forcing
+        has_wildcard = self._detect_wildcard_dns(base_domain)
+
         found_subdomains = []
 
-        # Method 1: DNS brute-force
-        dns_results = self._dns_bruteforce(base_domain)
-        found_subdomains.extend(dns_results)
+        if has_wildcard:
+            self.log("warning", f"Wildcard DNS detected for {base_domain} - skipping DNS brute-force")
+            self.add_finding(
+                severity="info",
+                title=f"Wildcard DNS detectado: *.{base_domain}",
+                description=(
+                    f"O dominio {base_domain} usa DNS wildcard, ou seja, qualquer subdominio "
+                    f"(ex: xyz123.{base_domain}) resolve para um IP. Isso e comum em "
+                    f"plataformas como Cloud Run, Vercel, Netlify, etc. "
+                    f"A enumeracao de subdominios via DNS nao e eficaz neste caso."
+                ),
+                evidence={"url": f"*.{base_domain}"},
+                remediation="Wildcard DNS e normal para plataformas cloud. Nenhuma acao necessaria.",
+                owasp_category="A05:2021 - Security Misconfiguration",
+                cvss_score=0.0,
+                affected_url=self.base_url,
+            )
+        else:
+            # Method 1: DNS brute-force (only when no wildcard)
+            dns_results = self._dns_bruteforce(base_domain)
+            found_subdomains.extend(dns_results)
 
         # Method 2: Certificate Transparency logs (via crt.sh)
         ct_results = self._check_certificate_transparency(base_domain)
@@ -74,13 +97,29 @@ class SubdomainScanner(BaseScanner):
         if unique_subdomains:
             self.log("info", f"Found {len(unique_subdomains)} subdomains")
 
-            # Check each discovered subdomain for issues
-            for subdomain in unique_subdomains:
+            # Check each discovered subdomain for issues (limit to avoid DoS)
+            for subdomain in unique_subdomains[:30]:
                 self._analyze_subdomain(subdomain, base_domain)
         else:
             self.log("info", "No additional subdomains discovered")
 
         self.log("info", "Subdomain discovery complete")
+
+    def _detect_wildcard_dns(self, base_domain: str) -> bool:
+        """Check if the domain has wildcard DNS by resolving random subdomains."""
+        random_labels = [
+            "".join(random.choices(string.ascii_lowercase + string.digits, k=12))
+            for _ in range(3)
+        ]
+        resolved = 0
+        for label in random_labels:
+            try:
+                socket.gethostbyname(f"{label}.{base_domain}")
+                resolved += 1
+            except socket.gaierror:
+                pass
+        # If 2+ random subdomains resolve, it's wildcard DNS
+        return resolved >= 2
 
     def _dns_bruteforce(self, base_domain: str) -> list[str]:
         """Try common subdomain prefixes via DNS resolution."""

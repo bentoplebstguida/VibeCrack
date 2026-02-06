@@ -166,6 +166,9 @@ class JobManager:
         # ---- Post-scan: generate PDF report ----
         self._generate_report()
 
+        # ---- Post-scan: AI analysis (Claude API) ----
+        self._generate_ai_analysis()
+
         # ---- Finalise ----
         final_status = "completed" if not had_errors else "completed"
         # Only mark as "failed" if ALL scanners errored out
@@ -270,6 +273,50 @@ class JobManager:
                 self.scan_id,
                 level="error",
                 message="Score calculation failed",
+                details={"traceback": tb},
+            )
+
+    def _generate_ai_analysis(self) -> None:
+        """Use Claude API to generate AI analysis and exploit playbook."""
+        import os
+
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            logger.info("ANTHROPIC_API_KEY not set, skipping AI analysis")
+            return
+
+        firebase_client.update_scan_progress(
+            self.scan_id, progress=99, current_phase="ai_analysis"
+        )
+        firebase_client.add_scan_log(
+            self.scan_id,
+            level="info",
+            message="Generating AI analysis with Claude",
+        )
+
+        try:
+            from engine.reporting.ai_analyzer import generate_ai_analysis
+            result = generate_ai_analysis(self.scan_id)
+            firebase_client.update_scan_status(
+                self.scan_id, "running",
+                extra_fields={
+                    "aiSummary": result["aiSummary"],
+                    "exploitPlaybook": result["exploitPlaybook"],
+                },
+            )
+            firebase_client.add_scan_log(
+                self.scan_id,
+                level="info",
+                message="AI analysis generated successfully",
+            )
+        except Exception:
+            tb = traceback.format_exc()
+            logger.error(
+                "AI analysis failed for scan %s:\n%s", self.scan_id, tb
+            )
+            firebase_client.add_scan_log(
+                self.scan_id,
+                level="warning",
+                message="AI analysis failed (non-critical)",
                 details={"traceback": tb},
             )
 

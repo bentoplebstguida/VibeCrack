@@ -12,6 +12,7 @@ import io
 import logging
 from datetime import datetime, timezone
 from typing import Any
+from xml.sax.saxutils import escape as xml_escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -342,14 +343,14 @@ def _build_technical_section(scan: dict, vulns: list, score_data: dict | None, s
         sev_style = styles.get(f"severity_{severity}", styles["body"])
 
         elements.append(Paragraph(
-            f"{i}. [{severity.upper()}] {vuln.get('title', 'N/A')}",
+            f"{i}. [{severity.upper()}] {xml_escape(vuln.get('title', 'N/A'))}",
             sev_style,
         ))
         elements.append(Spacer(1, 4))
 
         # Description
         elements.append(Paragraph(
-            f"<b>Descricao:</b> {vuln.get('description', 'N/A')}",
+            f"<b>Descricao:</b> {xml_escape(vuln.get('description', 'N/A'))}",
             styles["body"],
         ))
 
@@ -357,7 +358,7 @@ def _build_technical_section(scan: dict, vulns: list, score_data: dict | None, s
         affected = vuln.get("affectedUrl", "")
         if affected:
             elements.append(Paragraph(
-                f"<b>URL Afetada:</b> {affected}",
+                f"<b>URL Afetada:</b> {xml_escape(affected)}",
                 styles["body"],
             ))
 
@@ -380,9 +381,9 @@ def _build_technical_section(scan: dict, vulns: list, score_data: dict | None, s
         if isinstance(evidence, dict):
             ev_parts = []
             if evidence.get("payload"):
-                ev_parts.append(f"Payload: {evidence['payload']}")
+                ev_parts.append(f"Payload: {xml_escape(str(evidence['payload']))}")
             if evidence.get("response_snippet"):
-                ev_parts.append(f"Resposta: {str(evidence['response_snippet'])[:200]}")
+                ev_parts.append(f"Resposta: {xml_escape(str(evidence['response_snippet'])[:200])}")
             if ev_parts:
                 elements.append(Spacer(1, 4))
                 elements.append(Paragraph("<b>Evidencia:</b>", styles["body"]))
@@ -396,7 +397,7 @@ def _build_technical_section(scan: dict, vulns: list, score_data: dict | None, s
             elements.append(Paragraph("<b>Como Corrigir:</b>", styles["body"]))
             for line in remediation.split("\n"):
                 if line.strip():
-                    elements.append(Paragraph(line.strip(), styles["body"]))
+                    elements.append(Paragraph(xml_escape(line.strip()), styles["body"]))
 
         elements.append(Spacer(1, 8))
         elements.append(HRFlowable(width="100%", color=colors.HexColor("#f3f4f6")))
