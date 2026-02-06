@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Scan } from "@/lib/firestore";
-import { Bot, Copy, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { Bot, Copy, Check, ChevronDown, ChevronUp, Download } from "lucide-react";
 
 export default function AiSummarySection({ scan }: { scan: Scan }) {
   const [expanded, setExpanded] = useState(false);
@@ -14,6 +14,17 @@ export default function AiSummarySection({ scan }: { scan: Scan }) {
     await navigator.clipboard.writeText(scan.aiSummary!);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    const domain = scan.domain.replace(/https?:\/\//, "").replace(/[/\\:*?"<>|]/g, "_");
+    const blob = new Blob([scan.aiSummary!], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `analise-ia_${domain}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -40,8 +51,15 @@ export default function AiSummarySection({ scan }: { scan: Scan }) {
       {/* Expanded content */}
       {expanded && (
         <div className="px-5 pb-5 border-t border-gray-800">
-          {/* Copy button */}
-          <div className="flex justify-end mt-3 mb-2">
+          {/* Action buttons */}
+          <div className="flex justify-end gap-2 mt-3 mb-2">
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Baixar TXT
+            </button>
             <button
               onClick={handleCopy}
               className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors"
