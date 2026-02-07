@@ -35,6 +35,19 @@ def initialize() -> firestore.firestore.Client:
     if _app is not None and db is not None:
         return db
 
+    # Check if credentials file exists
+    import os
+    if not os.path.exists(FIREBASE_CREDENTIALS_PATH):
+        logger.error(
+            "Firebase credentials file not found at: %s", 
+            os.path.abspath(FIREBASE_CREDENTIALS_PATH)
+        )
+        logger.error(
+            "Please ensure 'serviceAccountKey.json' is present in the project root "
+            "or set FIREBASE_CREDENTIALS_PATH correctly."
+        )
+        raise FileNotFoundError(f"Firebase credentials not found at {FIREBASE_CREDENTIALS_PATH}")
+
     try:
         cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
         _app = firebase_admin.initialize_app(cred)
