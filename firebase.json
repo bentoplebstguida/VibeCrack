@@ -14,8 +14,24 @@
     "trailingSlash": true,
     "rewrites": [
       {
-        "source": "**",
-        "destination": "/index.html"
+        "source": "/scans/**",
+        "destination": "/scans/detail/index.html"
+      },
+      {
+        "source": "/projects/**",
+        "destination": "/projects/index.html"
+      },
+      {
+        "source": "/reports/**",
+        "destination": "/reports/index.html"
+      },
+      {
+        "source": "/dashboard/**",
+        "destination": "/dashboard/index.html"
+      },
+      {
+        "source": "/settings/**",
+        "destination": "/settings/index.html"
       }
     ]
   }
