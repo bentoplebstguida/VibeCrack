@@ -4,15 +4,23 @@ HackerPA Engine - Configuration
 
 import os
 
+# Run mode: "listener" (local Firestore watcher) or "cloudrun" (HTTP handler)
+RUN_MODE = os.environ.get("RUN_MODE", "listener")
+
 # Firebase
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIREBASE_CREDENTIALS_PATH = os.environ.get(
     "FIREBASE_CREDENTIALS_PATH",
     os.path.join(_PROJECT_ROOT, "serviceAccountKey.json")
 )
+FIREBASE_STORAGE_BUCKET = os.environ.get(
+    "FIREBASE_STORAGE_BUCKET",
+    "hackerpa-b6c1b.firebasestorage.app"
+)
 
 # Scan Settings
-SCAN_TIMEOUT = int(os.environ.get("SCAN_TIMEOUT", "300"))  # 5 min per scanner
+_default_timeout = "180" if RUN_MODE == "cloudrun" else "300"
+SCAN_TIMEOUT = int(os.environ.get("SCAN_TIMEOUT", _default_timeout))
 MAX_CONCURRENT_SCANS = int(os.environ.get("MAX_CONCURRENT_SCANS", "3"))
 REQUEST_DELAY = float(os.environ.get("REQUEST_DELAY", "0.5"))  # delay between requests
 

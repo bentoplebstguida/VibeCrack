@@ -162,4 +162,17 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    from engine.config import RUN_MODE
+
+    if RUN_MODE == "cloudrun":
+        # Cloud Run mode: start Flask/Gunicorn HTTP handler.
+        # When running via gunicorn this block isn't reached, but this
+        # allows `python -m engine.orchestrator.main` to work in cloudrun
+        # mode for local testing.
+        from engine.orchestrator.cloudrun_handler import app
+
+        port = int(os.environ.get("PORT", "8080"))
+        logger.info("Starting Cloud Run HTTP handler on port %d", port)
+        app.run(host="0.0.0.0", port=port)
+    else:
+        main()

@@ -13,7 +13,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
-from engine.config import FIREBASE_CREDENTIALS_PATH
+from engine.config import FIREBASE_CREDENTIALS_PATH, FIREBASE_STORAGE_BUCKET
 
 logger = logging.getLogger(__name__)
 
@@ -29,30 +29,28 @@ def initialize() -> firestore.firestore.Client:
     """Initialize the Firebase Admin SDK and return the Firestore client.
 
     Can be called multiple times safely; only the first call has an effect.
+    Uses serviceAccountKey.json when available (local dev), otherwise falls
+    back to Application Default Credentials (Cloud Run / GCE).
     """
     global _app, db
 
     if _app is not None and db is not None:
         return db
 
-    # Check if credentials file exists
     import os
-    if not os.path.exists(FIREBASE_CREDENTIALS_PATH):
-        logger.error(
-            "Firebase credentials file not found at: %s", 
-            os.path.abspath(FIREBASE_CREDENTIALS_PATH)
-        )
-        logger.error(
-            "Please ensure 'serviceAccountKey.json' is present in the project root "
-            "or set FIREBASE_CREDENTIALS_PATH correctly."
-        )
-        raise FileNotFoundError(f"Firebase credentials not found at {FIREBASE_CREDENTIALS_PATH}")
+
+    opts = {"storageBucket": FIREBASE_STORAGE_BUCKET}
 
     try:
-        cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
-        _app = firebase_admin.initialize_app(cred)
+        if os.path.exists(FIREBASE_CREDENTIALS_PATH):
+            cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
+            _app = firebase_admin.initialize_app(cred, opts)
+            logger.info("Firebase initialized with service account key.")
+        else:
+            # Cloud Run / GCE: use Application Default Credentials
+            _app = firebase_admin.initialize_app(options=opts)
+            logger.info("Firebase initialized with Application Default Credentials.")
         db = firestore.client()
-        logger.info("Firebase Admin SDK initialized successfully.")
     except ValueError:
         # App already initialized (e.g. in tests)
         _app = firebase_admin.get_app()
@@ -87,7 +85,13 @@ def listen_for_pending_scans(callback: Callable[[list], None]) -> Any:
         if doc_snapshots:
             callback(doc_snapshots)
 
+    def _on_error(error):
+        """Firestore on_snapshot error callback."""
+        logger.error("Firestore listener error: %s", error)
+
     watcher = query.on_snapshot(_on_snapshot)
+    # The SDK on_snapshot doesn't always take an error callback in this version
+    # so we rely on the main thread catching issues if it dies.
     logger.info("Listening for pending scans in Firestore...")
     return watcher
 
@@ -102,6 +106,12 @@ def get_pending_scans() -> list:
         .order_by("createdAt")
     )
     return list(query.stream())
+
+
+def get_scan_by_id(scan_id: str):
+    """Fetch a single scan document by ID. Returns the DocumentSnapshot."""
+    _ensure_db()
+    return db.collection("scans").document(scan_id).get()
 
 
 # ---------------------------------------------------------------------------
