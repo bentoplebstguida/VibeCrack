@@ -23,27 +23,38 @@ import {
 } from "lucide-react";
 
 export default function ScansListClient() {
-  const { user } = useAuth();
+  const { uid } = useAuth();
   const router = useRouter();
   const [scans, setScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!uid) {
+      return;
+    }
+
     const q = query(
       collection(db, "scans"),
-      where("userId", "==", user.uid),
+      where("userId", "==", uid),
       orderBy("createdAt", "desc")
     );
 
-    const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Scan[];
-      setScans(data);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const data = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Scan[];
+        setScans(data);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Firestore scans listener error:", error);
+        setScans([]);
+        setLoading(false);
+      }
+    );
 
     return unsub;
-  }, [user]);
+  }, [uid]);
 
   const statusIcon = (status: string) => {
     switch (status) {

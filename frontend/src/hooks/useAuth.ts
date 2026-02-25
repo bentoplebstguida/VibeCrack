@@ -26,6 +26,8 @@ export function useAuth() {
     return unsubscribe;
   }, []);
 
+  const uid = user?.uid ?? null;
+
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
       return signInWithEmailAndPassword(auth, email, password);
@@ -50,6 +52,7 @@ export function useAuth() {
 
   return {
     user,
+    uid,
     loading,
     signInWithEmail,
     signUpWithEmail,

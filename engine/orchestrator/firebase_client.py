@@ -96,7 +96,7 @@ def listen_for_pending_scans(callback: Callable[[list], None]) -> Any:
     return watcher
 
 
-def get_pending_scans() -> list:
+def get_pending_scans(timeout_sec: float = 15.0) -> list:
     """One-shot query: return all scan documents with status='pending'."""
     _ensure_db()
 
@@ -105,7 +105,7 @@ def get_pending_scans() -> list:
         .where(filter=FieldFilter("status", "==", "pending"))
         .order_by("createdAt")
     )
-    return list(query.stream())
+    return list(query.stream(timeout=timeout_sec))
 
 
 def get_scan_by_id(scan_id: str):

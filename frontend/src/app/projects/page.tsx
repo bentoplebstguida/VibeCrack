@@ -34,6 +34,7 @@ function ProjectsContent() {
     description: "",
   });
   const [formError, setFormError] = useState("");
+  const [scanError, setScanError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,11 +69,17 @@ function ProjectsContent() {
   };
 
   const handleStartScan = async (projectId: string, domain: string) => {
+    setScanError("");
     try {
       const scanId = await startScan(projectId, domain);
       router.push(`/scans/detail?scanId=${scanId}`);
     } catch (err: unknown) {
       console.error("Erro ao iniciar scan:", err);
+      setScanError(
+        err instanceof Error
+          ? err.message
+          : "Falha ao iniciar scan. Tente novamente."
+      );
     }
   };
 
@@ -102,6 +109,12 @@ function ProjectsContent() {
       </div>
 
       {/* New Project Form */}
+      {scanError && (
+        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-lg mb-6 text-sm">
+          {scanError}
+        </div>
+      )}
+
       {showForm && (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">

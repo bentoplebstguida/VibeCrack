@@ -128,6 +128,21 @@ def main() -> None:
     # 2. Start real-time listener for pending scans
     watcher = firebase_client.listen_for_pending_scans(_on_pending_scans)
 
+    # 2.1 Startup connectivity/backfill check so we don't run silently
+    # disconnected from Firestore.
+    try:
+        pending = firebase_client.get_pending_scans()
+        logger.info("Startup check: %d pending scan(s) found", len(pending))
+        if pending:
+            _on_pending_scans(pending)
+    except Exception:
+        logger.exception(
+            "Failed to query pending scans on startup. "
+            "Check Firestore connectivity/credentials."
+        )
+        watcher.unsubscribe()
+        raise SystemExit(1)
+
     logger.info("Engine is running. Waiting for scans...")
 
     # 3. Block until shutdown signal

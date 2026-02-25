@@ -71,7 +71,7 @@ export function useProjectScans(projectId: string | null) {
 }
 
 export function useStartScan() {
-  const { user } = useAuth();
+  const { uid } = useAuth();
   const [starting, setStarting] = useState(false);
 
   const startScan = async (
@@ -80,11 +80,14 @@ export function useStartScan() {
     scanType: ScanType = "full",
     modules?: ScanModule[]
   ) => {
-    if (!user) throw new Error("User not authenticated");
+    if (!uid) {
+      throw new Error("Usuario nao autenticado. Faca login novamente.");
+    }
+
     setStarting(true);
     try {
       const scanId = await firebaseStartScan(
-        user.uid,
+        uid,
         projectId,
         domain,
         scanType,

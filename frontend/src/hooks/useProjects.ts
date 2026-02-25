@@ -11,33 +11,33 @@ import {
 } from "@/lib/firestore";
 
 export function useProjects() {
-  const { user } = useAuth();
+  const { uid } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
-      setProjects([]);
-      setLoading(false);
+    if (!uid) {
       return;
     }
 
     setLoading(true);
-    const unsubscribe = subscribeToProjects(user.uid, (data) => {
+    const unsubscribe = subscribeToProjects(uid, (data) => {
       setProjects(data);
       setLoading(false);
     });
 
     return unsubscribe;
-  }, [user]);
+  }, [uid]);
 
   const addProject = async (data: {
     name: string;
     domain: string;
     description: string;
   }) => {
-    if (!user) throw new Error("User not authenticated");
-    return createProject(user.uid, data);
+    if (!uid) {
+      throw new Error("Usuario nao autenticado. Faca login novamente.");
+    }
+    return createProject(uid, data);
   };
 
   const editProject = async (
