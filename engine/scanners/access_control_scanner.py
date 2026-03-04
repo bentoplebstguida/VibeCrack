@@ -199,14 +199,16 @@ class AccessControlScanner(BaseScanner):
     # ==================================================================
 
     def _load_crawl_data(self) -> dict:
-        """Attempt to load crawl data from Firestore for this scan."""
+        """Attempt to load crawl data for this scan."""
         try:
+            if self._data_store:
+                return self._data_store.get_crawl_data(self.scan_id)
             doc = firebase_client.db.collection("scans").document(self.scan_id).get()
             if doc.exists:
                 data = doc.to_dict()
                 return data.get("crawlData", {}) or {}
         except Exception:
-            self.log("warning", "Could not load crawl data from Firestore")
+            self.log("warning", "Could not load crawl data")
         return {}
 
     def _resolve(self, raw: str) -> Optional[str]:

@@ -90,12 +90,13 @@ class JobManager:
         The Firestore document snapshot for the scan.
     """
 
-    def __init__(self, scan_snapshot: Any) -> None:
+    def __init__(self, scan_snapshot: Any, *, data_store=None) -> None:
         self.scan_id: str = scan_snapshot.id
         self.scan_data: dict[str, Any] = scan_snapshot.to_dict()
         self.domain: str = self.scan_data.get("domain", "")
         self.project_id: str = self.scan_data.get("projectId", "")
         self.modules: list[str] = self.scan_data.get("modules", [])
+        self.data_store = data_store  # None = legacy firebase_client path
 
         # Track per-module results
         self.results: dict[str, str] = {}  # module_name -> "success" | "error"
@@ -104,9 +105,45 @@ class JobManager:
     # Public API
     # ------------------------------------------------------------------
 
+    # -- DataStore helpers (dual-path) --------------------------------------
+
+    def _update_status(self, status, *, progress=None, current_phase=None, extra_fields=None):
+        if self.data_store:
+            self.data_store.update_scan_status(
+                self.scan_id, status,
+                progress=progress, current_phase=current_phase,
+                extra_fields=extra_fields,
+            )
+        else:
+            firebase_client.update_scan_status(
+                self.scan_id, status,
+                progress=progress, current_phase=current_phase,
+                extra_fields=extra_fields,
+            )
+
+    def _update_progress(self, progress, current_phase):
+        if self.data_store:
+            self.data_store.update_scan_progress(self.scan_id, progress, current_phase)
+        else:
+            firebase_client.update_scan_progress(self.scan_id, progress, current_phase)
+
+    def _add_log(self, *, level="info", message="", details=None, scanner=""):
+        if self.data_store:
+            self.data_store.add_scan_log(
+                self.scan_id, level=level, message=message,
+                details=details, scanner=scanner,
+            )
+        else:
+            firebase_client.add_scan_log(
+                self.scan_id, level=level, message=message,
+                details=details, scanner=scanner,
+            )
+
+    # -- Public API ----------------------------------------------------------
+
     def run(self) -> None:
         """Execute all requested scanner modules sequentially, update
-        Firestore as progress is made, and finalise the scan.
+        progress as we go, and finalise the scan.
         """
         logger.info(
             "Starting scan %s for domain %s (modules: %s)",
@@ -116,11 +153,8 @@ class JobManager:
         )
 
         # Mark scan as running
-        firebase_client.update_scan_status(
-            self.scan_id, "running", progress=0, current_phase="initializing"
-        )
-        firebase_client.add_scan_log(
-            self.scan_id,
+        self._update_status("running", progress=0, current_phase="initializing")
+        self._add_log(
             level="info",
             message=f"Scan started for {self.domain}",
             details={"modules": self.modules},
@@ -134,13 +168,10 @@ class JobManager:
             # Check if scan was cancelled by the user
             if self._is_cancelled():
                 logger.info("Scan %s was cancelled by user", self.scan_id)
-                firebase_client.add_scan_log(
-                    self.scan_id,
-                    level="info",
-                    message="Scan cancelado pelo usuario",
-                )
-                firebase_client.update_scan_status(
-                    self.scan_id, "cancelled", progress=self._progress(completed, total),
+                self._add_log(level="info", message="Scan cancelado pelo usuario")
+                self._update_status(
+                    "cancelled",
+                    progress=self._progress(completed, total),
                     current_phase="cancelled",
                 )
                 return
@@ -158,8 +189,7 @@ class JobManager:
                     self.scan_id,
                     tb,
                 )
-                firebase_client.add_scan_log(
-                    self.scan_id,
+                self._add_log(
                     level="error",
                     message=f"Scanner '{module_name}' failed",
                     details={"traceback": tb},
@@ -168,9 +198,7 @@ class JobManager:
             finally:
                 completed += 1
                 progress = int((completed / total) * 100)
-                firebase_client.update_scan_progress(
-                    self.scan_id, progress=min(progress, 95), current_phase=module_name
-                )
+                self._update_progress(min(progress, 95), module_name)
 
         # ---- Post-scan: calculate score ----
         self._calculate_score()
@@ -182,23 +210,22 @@ class JobManager:
         self._generate_ai_analysis()
 
         # ---- Finalise ----
+        from datetime import datetime, timezone
         final_status = "completed" if not had_errors else "completed"
         # Only mark as "failed" if ALL scanners errored out
         if had_errors and all(v == "error" for v in self.results.values()):
             final_status = "failed"
 
-        firebase_client.update_scan_status(
-            self.scan_id,
+        self._update_status(
             final_status,
             progress=100,
             current_phase="done",
             extra_fields={
-                "completedAt": firebase_client._now(),
+                "completedAt": datetime.now(timezone.utc),
                 "scannerResults": self.results,
             },
         )
-        firebase_client.add_scan_log(
-            self.scan_id,
+        self._add_log(
             level="info",
             message=f"Scan finished with status: {final_status}",
             details={"results": self.results},
@@ -211,7 +238,9 @@ class JobManager:
     # ------------------------------------------------------------------
 
     def _is_cancelled(self) -> bool:
-        """Check Firestore if the scan status was set to 'cancelled'."""
+        """Check if the scan status was set to 'cancelled'."""
+        if self.data_store:
+            return self.data_store.is_scan_cancelled(self.scan_id)
         try:
             doc = firebase_client.db.collection("scans").document(self.scan_id).get()
             if doc.exists:
@@ -231,13 +260,8 @@ class JobManager:
             raise ValueError(f"Unknown scanner module: {module_name}")
 
         logger.info("Running scanner: %s (%d/%d)", module_name, completed + 1, total)
-        firebase_client.update_scan_progress(
-            self.scan_id,
-            progress=int((completed / total) * 100),
-            current_phase=module_name,
-        )
-        firebase_client.add_scan_log(
-            self.scan_id,
+        self._update_progress(int((completed / total) * 100), module_name)
+        self._add_log(
             level="info",
             message=f"Starting scanner: {module_name}",
             scanner=module_name,
@@ -247,16 +271,16 @@ class JobManager:
         mod = importlib.import_module(registry_entry["module"])
         scanner_cls = getattr(mod, registry_entry["class"])
 
-        # Instantiate and run
+        # Instantiate and run (pass data_store to scanner)
         scanner_instance = scanner_cls(
             scan_id=self.scan_id,
             project_id=self.project_id,
             domain=self.domain,
+            data_store=self.data_store,
         )
         scanner_instance.run()
 
-        firebase_client.add_scan_log(
-            self.scan_id,
+        self._add_log(
             level="info",
             message=f"Scanner '{module_name}' completed successfully",
             scanner=module_name,
@@ -264,25 +288,21 @@ class JobManager:
 
     def _calculate_score(self) -> None:
         """Trigger the scoring module to compute an overall security score."""
-        firebase_client.update_scan_progress(
-            self.scan_id, progress=98, current_phase="scoring"
-        )
-        firebase_client.add_scan_log(
-            self.scan_id,
-            level="info",
-            message="Calculating security score",
-        )
+        self._update_progress(98, "scoring")
+        self._add_log(level="info", message="Calculating security score")
 
         try:
-            from engine.scoring.calculator import calculate
-            calculate(self.scan_id)
+            from engine.scoring.calculator import calculate, calculate_local
+            if self.data_store:
+                calculate_local(self.scan_id, self.project_id, self.data_store)
+            else:
+                calculate(self.scan_id)
         except Exception:
             tb = traceback.format_exc()
             logger.error(
                 "Score calculation failed for scan %s:\n%s", self.scan_id, tb
             )
-            firebase_client.add_scan_log(
-                self.scan_id,
+            self._add_log(
                 level="error",
                 message="Score calculation failed",
                 details={"traceback": tb},
@@ -296,72 +316,53 @@ class JobManager:
             logger.info("ANTHROPIC_API_KEY not set, skipping AI analysis")
             return
 
-        firebase_client.update_scan_progress(
-            self.scan_id, progress=99, current_phase="ai_analysis"
-        )
-        firebase_client.add_scan_log(
-            self.scan_id,
-            level="info",
-            message="Generating AI analysis with Claude",
-        )
+        self._update_progress(99, "ai_analysis")
+        self._add_log(level="info", message="Generating AI analysis with Claude")
 
         try:
             from engine.reporting.ai_analyzer import generate_ai_analysis
-            result = generate_ai_analysis(self.scan_id)
-            firebase_client.update_scan_status(
-                self.scan_id, "running",
+            result = generate_ai_analysis(self.scan_id, data_store=self.data_store)
+            self._update_status(
+                "running",
                 extra_fields={
                     "aiSummary": result["aiSummary"],
                     "exploitPlaybook": result["exploitPlaybook"],
                 },
             )
-            firebase_client.add_scan_log(
-                self.scan_id,
-                level="info",
-                message="AI analysis generated successfully",
-            )
+            self._add_log(level="info", message="AI analysis generated successfully")
         except Exception:
             tb = traceback.format_exc()
             logger.error(
                 "AI analysis failed for scan %s:\n%s", self.scan_id, tb
             )
-            firebase_client.add_scan_log(
-                self.scan_id,
+            self._add_log(
                 level="warning",
                 message="AI analysis failed (non-critical)",
                 details={"traceback": tb},
             )
 
     def _generate_report(self) -> None:
-        """Generate PDF report and upload to Firebase Storage."""
-        firebase_client.update_scan_progress(
-            self.scan_id, progress=99, current_phase="reporting"
-        )
-        firebase_client.add_scan_log(
-            self.scan_id,
-            level="info",
-            message="Generating PDF report",
-        )
+        """Generate PDF report and upload/save."""
+        self._update_progress(99, "reporting")
+        self._add_log(level="info", message="Generating PDF report")
 
         try:
             from engine.reporting.pdf_generator import generate_and_upload
-            report_url = generate_and_upload(self.scan_id, report_type="full")
-            firebase_client.update_scan_status(
-                self.scan_id, "running",
-                extra_fields={"reportUrl": report_url},
+            report_url = generate_and_upload(
+                self.scan_id, report_type="full", data_store=self.data_store
             )
-            firebase_client.add_scan_log(
-                self.scan_id,
-                level="info",
-                message=f"PDF report generated: {report_url}",
+            self._update_status(
+                "running", extra_fields={"reportUrl": report_url}
+            )
+            self._add_log(
+                level="info", message=f"PDF report generated: {report_url}"
             )
         except Exception:
             tb = traceback.format_exc()
             logger.error(
                 "PDF generation failed for scan %s:\n%s", self.scan_id, tb
             )
-            firebase_client.add_scan_log(
-                self.scan_id,
+            self._add_log(
                 level="warning",
                 message="PDF report generation failed (non-critical)",
                 details={"traceback": tb},

@@ -69,37 +69,15 @@ def score_to_grade(score: int) -> str:
     return "F"
 
 
-def calculate(scan_id: str) -> dict[str, Any]:
-    """Calculate the security score for a completed scan.
+def calculate_from_vulns(vuln_list: list[dict]) -> dict[str, Any]:
+    """Pure scoring logic -- no database dependencies.
 
-    Reads all vulnerabilities for the scan, computes per-category
-    scores, an overall weighted score, and saves everything to
-    Firestore (scores_history collection + updates scan and project docs).
+    Takes a list of vulnerability dicts (each with ``scanner`` and
+    ``severity`` keys) and returns the score breakdown.
     """
-    firebase_client._ensure_db()
-    db = firebase_client.db
-
-    # 1. Get scan document
-    scan_ref = db.collection("scans").document(scan_id)
-    scan_doc = scan_ref.get()
-    if not scan_doc.exists:
-        raise ValueError(f"Scan {scan_id} not found")
-
-    scan_data = scan_doc.to_dict()
-    project_id = scan_data.get("projectId", "")
-
-    # 2. Get all vulnerabilities for this scan
-    vulns = list(
-        db.collection("vulnerabilities")
-        .where("scanId", "==", scan_id)
-        .stream()
-    )
-
-    # 3. Compute per-category scores
     category_findings: dict[str, list[str]] = {cat: [] for cat in CATEGORY_WEIGHTS}
 
-    for vuln_doc in vulns:
-        vuln = vuln_doc.to_dict()
+    for vuln in vuln_list:
         scanner = vuln.get("scanner", "")
         severity = vuln.get("severity", "info")
         category = SCANNER_CATEGORY_MAP.get(scanner, "configuration")
@@ -120,49 +98,98 @@ def calculate(scan_id: str) -> dict[str, Any]:
             "weight": weight,
         }
 
-    # 4. Compute overall weighted score
     overall_score = 0
     for category, data in category_scores.items():
         overall_score += data["score"] * (data["weight"] / 100)
     overall_score = max(0, min(100, round(overall_score)))
     overall_grade = score_to_grade(overall_score)
 
-    logger.info(
-        "Scan %s score: %d (%s) - categories: %s",
-        scan_id,
-        overall_score,
-        overall_grade,
-        {k: v["score"] for k, v in category_scores.items()},
-    )
-
-    # 5. Save score history
-    db.collection("scores_history").add({
-        "projectId": project_id,
-        "scanId": scan_id,
-        "overallScore": overall_score,
-        "grade": overall_grade,
-        "categories": category_scores,
-        "createdAt": datetime.now(timezone.utc),
-    })
-
-    # 6. Update scan document with score
-    scan_ref.update({
-        "score": overall_score,
-        "grade": overall_grade,
-    })
-
-    # 7. Update project with current score
-    if project_id:
-        from google.cloud.firestore_v1 import transforms
-        db.collection("projects").document(project_id).update({
-            "currentScore": overall_score,
-            "currentGrade": overall_grade,
-            "lastScanAt": datetime.now(timezone.utc),
-            "totalScans": transforms.Increment(1),
-        })
-
     return {
         "overallScore": overall_score,
         "grade": overall_grade,
         "categories": category_scores,
     }
+
+
+def calculate_local(scan_id: str, project_id: str, data_store) -> dict[str, Any]:
+    """Calculate score using a DataStore (CLI / standalone mode)."""
+    vulns = data_store.get_vulnerabilities(scan_id)
+    result = calculate_from_vulns(vulns)
+
+    logger.info(
+        "Scan %s score: %d (%s) - categories: %s",
+        scan_id,
+        result["overallScore"],
+        result["grade"],
+        {k: v["score"] for k, v in result["categories"].items()},
+    )
+
+    data_store.save_score(scan_id, project_id, result)
+    return result
+
+
+def calculate(scan_id: str) -> dict[str, Any]:
+    """Calculate the security score for a completed scan (Firebase mode).
+
+    Reads all vulnerabilities for the scan, computes per-category
+    scores, an overall weighted score, and saves everything to
+    Firestore (scores_history collection + updates scan and project docs).
+    """
+    firebase_client._ensure_db()
+    db = firebase_client.db
+
+    # 1. Get scan document
+    scan_ref = db.collection("scans").document(scan_id)
+    scan_doc = scan_ref.get()
+    if not scan_doc.exists:
+        raise ValueError(f"Scan {scan_id} not found")
+
+    scan_data = scan_doc.to_dict()
+    project_id = scan_data.get("projectId", "")
+
+    # 2. Get all vulnerabilities for this scan
+    vulns_docs = list(
+        db.collection("vulnerabilities")
+        .where("scanId", "==", scan_id)
+        .stream()
+    )
+    vuln_list = [doc.to_dict() for doc in vulns_docs]
+
+    # 3. Compute scores using the pure function
+    result = calculate_from_vulns(vuln_list)
+
+    logger.info(
+        "Scan %s score: %d (%s) - categories: %s",
+        scan_id,
+        result["overallScore"],
+        result["grade"],
+        {k: v["score"] for k, v in result["categories"].items()},
+    )
+
+    # 4. Save score history
+    db.collection("scores_history").add({
+        "projectId": project_id,
+        "scanId": scan_id,
+        "overallScore": result["overallScore"],
+        "grade": result["grade"],
+        "categories": result["categories"],
+        "createdAt": datetime.now(timezone.utc),
+    })
+
+    # 5. Update scan document with score
+    scan_ref.update({
+        "score": result["overallScore"],
+        "grade": result["grade"],
+    })
+
+    # 6. Update project with current score
+    if project_id:
+        from google.cloud.firestore_v1 import transforms
+        db.collection("projects").document(project_id).update({
+            "currentScore": result["overallScore"],
+            "currentGrade": result["grade"],
+            "lastScanAt": datetime.now(timezone.utc),
+            "totalScans": transforms.Increment(1),
+        })
+
+    return result

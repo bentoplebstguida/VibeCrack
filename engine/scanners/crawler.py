@@ -78,8 +78,8 @@ class CrawlerScanner(BaseScanner):
 
     scanner_name = "crawler"
 
-    def __init__(self, scan_id: str, project_id: str, domain: str) -> None:
-        super().__init__(scan_id, project_id, domain)
+    def __init__(self, scan_id: str, project_id: str, domain: str, **kwargs) -> None:
+        super().__init__(scan_id, project_id, domain, **kwargs)
 
         # Parsed origin used for same-domain filtering
         parsed = urlparse(self.base_url)
@@ -118,13 +118,16 @@ class CrawlerScanner(BaseScanner):
         }
 
         try:
-            firebase_client.update_scan_status(
-                self.scan_id,
-                "running",
-                extra_fields={"crawlData": crawl_data},
-            )
+            if self._data_store:
+                self._data_store.save_crawl_data(self.scan_id, crawl_data)
+            else:
+                firebase_client.update_scan_status(
+                    self.scan_id,
+                    "running",
+                    extra_fields={"crawlData": crawl_data},
+                )
         except Exception:
-            self.log("error", "Failed to persist crawlData to Firestore")
+            self.log("error", "Failed to persist crawlData")
 
         # Log summary
         self.log("info", (

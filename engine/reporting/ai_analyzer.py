@@ -110,7 +110,7 @@ Para vulnerabilidades SEM proofResult, mostre o comando que o usuario pode rodar
 IMPORTANTE: Foque nos resultados REAIS. Nao invente resultados. Use EXATAMENTE o que esta em proofResult.output."""
 
 
-def generate_ai_analysis(scan_id: str) -> dict[str, str]:
+def generate_ai_analysis(scan_id: str, *, data_store=None) -> dict[str, str]:
     """Call Claude API to generate AI analysis and exploit playbook.
 
     Returns a dict with keys 'aiSummary' and 'exploitPlaybook'.
@@ -119,8 +119,8 @@ def generate_ai_analysis(scan_id: str) -> dict[str, str]:
     if not api_key:
         raise RuntimeError("ANTHROPIC_API_KEY not set")
 
-    # Gather all scan data from Firestore
-    scan_data = _gather_scan_data(scan_id)
+    # Gather all scan data
+    scan_data = _gather_scan_data(scan_id, data_store=data_store)
 
     # Execute verification commands and attach real output
     logger.info("Executing verification commands for scan %s...", scan_id)
@@ -386,30 +386,49 @@ def _proof_subdomain(url: str, title: str) -> dict[str, str]:
 # Firestore data gathering
 # ---------------------------------------------------------------------------
 
-def _gather_scan_data(scan_id: str) -> dict[str, Any]:
-    """Read all relevant scan data from Firestore for the AI analysis."""
-    firebase_client._ensure_db()
-    db = firebase_client.db
+def _gather_scan_data(scan_id: str, *, data_store=None) -> dict[str, Any]:
+    """Read all relevant scan data for the AI analysis."""
+    if data_store:
+        combined = data_store.get_scan_with_vulns_and_score(scan_id)
+        scan = combined
+        vulns_raw = combined.get("vulnerabilities", [])
+        score_data = combined.get("score_data") or None
+    else:
+        firebase_client._ensure_db()
+        db = firebase_client.db
 
-    # Scan document
-    scan_doc = db.collection("scans").document(scan_id).get()
-    if not scan_doc.exists:
-        raise ValueError(f"Scan {scan_id} not found")
-    scan = scan_doc.to_dict()
+        scan_doc = db.collection("scans").document(scan_id).get()
+        if not scan_doc.exists:
+            raise ValueError(f"Scan {scan_id} not found")
+        scan = scan_doc.to_dict()
 
-    # All vulnerabilities
-    vulns_raw = [
-        doc.to_dict()
-        for doc in db.collection("vulnerabilities")
-        .where("scanId", "==", scan_id)
-        .stream()
-    ]
+        vulns_raw = [
+            doc.to_dict()
+            for doc in db.collection("vulnerabilities")
+            .where("scanId", "==", scan_id)
+            .stream()
+        ]
+
+        scores = list(
+            db.collection("scores_history")
+            .where("scanId", "==", scan_id)
+            .limit(1)
+            .stream()
+        )
+        score_data = None
+        if scores:
+            sd = scores[0].to_dict()
+            score_data = {
+                "overallScore": sd.get("overallScore"),
+                "grade": sd.get("grade"),
+                "categories": sd.get("categories", {}),
+            }
 
     # Sort by severity
     severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
     vulns_raw.sort(key=lambda v: severity_order.get(v.get("severity", "info"), 5))
 
-    # Simplify vulnerability data for the prompt (remove Firestore timestamps)
+    # Simplify vulnerability data for the prompt
     vulns = []
     for v in vulns_raw:
         vulns.append({
@@ -423,22 +442,6 @@ def _gather_scan_data(scan_id: str) -> dict[str, Any]:
             "owaspCategory": v.get("owaspCategory"),
             "cvssScore": v.get("cvssScore"),
         })
-
-    # Score history
-    scores = list(
-        db.collection("scores_history")
-        .where("scanId", "==", scan_id)
-        .limit(1)
-        .stream()
-    )
-    score_data = None
-    if scores:
-        sd = scores[0].to_dict()
-        score_data = {
-            "overallScore": sd.get("overallScore"),
-            "grade": sd.get("grade"),
-            "categories": sd.get("categories", {}),
-        }
 
     return {
         "domain": scan.get("domain"),

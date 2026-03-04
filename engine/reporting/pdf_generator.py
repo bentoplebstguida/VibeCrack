@@ -108,44 +108,49 @@ def _build_styles() -> dict[str, ParagraphStyle]:
     }
 
 
-def generate_report(scan_id: str, report_type: str = "full") -> bytes:
+def generate_report(scan_id: str, report_type: str = "full", *, data_store=None) -> bytes:
     """Generate a PDF report for a scan.
 
     Args:
-        scan_id: Firestore scan document ID
+        scan_id: Scan document ID
         report_type: "executive" (CEO), "technical" (dev), or "full" (both)
+        data_store: Optional DataStore; if None, reads from Firebase
 
     Returns:
         PDF file content as bytes
     """
-    firebase_client._ensure_db()
-    db = firebase_client.db
+    if data_store:
+        combined = data_store.get_scan_with_vulns_and_score(scan_id)
+        scan = combined
+        vulns = combined.get("vulnerabilities", [])
+        score_data = combined.get("score_data") or None
+    else:
+        firebase_client._ensure_db()
+        db = firebase_client.db
 
-    # Fetch data
-    scan_doc = db.collection("scans").document(scan_id).get()
-    if not scan_doc.exists:
-        raise ValueError(f"Scan {scan_id} not found")
-    scan = scan_doc.to_dict()
+        scan_doc = db.collection("scans").document(scan_id).get()
+        if not scan_doc.exists:
+            raise ValueError(f"Scan {scan_id} not found")
+        scan = scan_doc.to_dict()
 
-    vulns = [
-        doc.to_dict()
-        for doc in db.collection("vulnerabilities")
-        .where("scanId", "==", scan_id)
-        .stream()
-    ]
+        vulns = [
+            doc.to_dict()
+            for doc in db.collection("vulnerabilities")
+            .where("scanId", "==", scan_id)
+            .stream()
+        ]
+
+        scores = list(
+            db.collection("scores_history")
+            .where("scanId", "==", scan_id)
+            .limit(1)
+            .stream()
+        )
+        score_data = scores[0].to_dict() if scores else None
 
     # Sort by severity
     severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
     vulns.sort(key=lambda v: severity_order.get(v.get("severity", "info"), 5))
-
-    # Fetch score
-    scores = list(
-        db.collection("scores_history")
-        .where("scanId", "==", scan_id)
-        .limit(1)
-        .stream()
-    )
-    score_data = scores[0].to_dict() if scores else None
 
     # Build PDF
     buffer = io.BytesIO()
@@ -406,16 +411,23 @@ def _build_technical_section(scan: dict, vulns: list, score_data: dict | None, s
     return elements
 
 
-def generate_and_upload(scan_id: str, report_type: str = "full") -> str:
-    """Generate a PDF report and upload it to Firebase Storage.
+def generate_and_upload(scan_id: str, report_type: str = "full", *, data_store=None) -> str:
+    """Generate a PDF report and upload/save it.
 
-    Returns the Storage download URL.
+    When data_store is provided, saves locally via data_store.save_report().
+    Otherwise uploads to Firebase Storage.
+
+    Returns the URL or local file path.
     """
+    pdf_bytes = generate_report(scan_id, report_type, data_store=data_store)
+
+    if data_store:
+        path = data_store.save_report(scan_id, pdf_bytes, report_type)
+        logger.info("PDF report saved to %s", path)
+        return path
+
     from firebase_admin import storage as fb_storage
 
-    pdf_bytes = generate_report(scan_id, report_type)
-
-    # Upload to Firebase Storage
     bucket = fb_storage.bucket()
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     blob_path = f"reports/{scan_id}/{report_type}_{timestamp}.pdf"

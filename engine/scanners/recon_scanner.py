@@ -94,9 +94,12 @@ class ReconScanner(BaseScanner):
         self.detected_tech = unique_tech
         if unique_tech:
             try:
-                firebase_client.save_detected_tech(self.scan_id, unique_tech)
+                if self._data_store:
+                    self._data_store.save_detected_tech(self.scan_id, unique_tech)
+                else:
+                    firebase_client.save_detected_tech(self.scan_id, unique_tech)
             except Exception:
-                self.log("warning", "Could not save detected tech to Firestore")
+                self.log("warning", "Could not save detected tech")
             self.log("info", f"Detected technologies: {', '.join(unique_tech)}")
             self.add_finding(
                 severity="info",

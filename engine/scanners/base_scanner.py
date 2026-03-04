@@ -98,10 +98,13 @@ class BaseScanner(ABC):
 
     scanner_name: str = "base"
 
-    def __init__(self, scan_id: str, project_id: str, domain: str) -> None:
+    def __init__(
+        self, scan_id: str, project_id: str, domain: str, *, data_store=None
+    ) -> None:
         self.scan_id = scan_id
         self.project_id = project_id
         self.domain = domain
+        self._data_store = data_store  # None = legacy firebase_client path
 
         # Ensure the domain has a scheme for making requests
         if domain and not domain.startswith(("http://", "https://")):
@@ -115,17 +118,23 @@ class BaseScanner(ABC):
         # Circuit Breaker for Safe Mode (prevents accidental DoS)
         self._circuit_breaker = CircuitBreaker()
 
-        # Detected technologies (populated by recon scanner, shared via Firestore)
-        try:
-            self.detected_tech: list[str] = firebase_client.get_detected_tech(scan_id)
-        except Exception:
-            self.detected_tech = []
+        # Detected technologies (populated by recon scanner)
+        if self._data_store:
+            self.detected_tech: list[str] = self._data_store.get_detected_tech(scan_id)
+        else:
+            try:
+                self.detected_tech = firebase_client.get_detected_tech(scan_id)
+            except Exception:
+                self.detected_tech = []
 
-        # Crawl data (populated by crawler, shared via Firestore)
-        try:
-            self.crawl_data: dict = firebase_client.get_crawl_data(scan_id)
-        except Exception:
-            self.crawl_data = {}
+        # Crawl data (populated by crawler)
+        if self._data_store:
+            self.crawl_data: dict = self._data_store.get_crawl_data(scan_id)
+        else:
+            try:
+                self.crawl_data = firebase_client.get_crawl_data(scan_id)
+            except Exception:
+                self.crawl_data = {}
 
     # ------------------------------------------------------------------
     # Abstract interface
@@ -165,17 +174,26 @@ class BaseScanner(ABC):
         py_level = getattr(logging, level.upper(), logging.INFO)
         logger.log(py_level, "[%s] scan=%s %s", self.scanner_name, self.scan_id, message)
 
-        # Firestore
-        try:
-            firebase_client.add_scan_log(
+        # Data store
+        if self._data_store:
+            self._data_store.add_scan_log(
                 self.scan_id,
                 level=level,
                 message=message,
                 details=details,
                 scanner=self.scanner_name,
             )
-        except Exception:
-            logger.exception("Failed to write scan log to Firestore")
+        else:
+            try:
+                firebase_client.add_scan_log(
+                    self.scan_id,
+                    level=level,
+                    message=message,
+                    details=details,
+                    scanner=self.scanner_name,
+                )
+            except Exception:
+                logger.exception("Failed to write scan log to Firestore")
 
     # ------------------------------------------------------------------
     # Finding helper
@@ -223,8 +241,8 @@ class BaseScanner(ABC):
             "affected_url": affected_url,
         })
 
-        try:
-            return firebase_client.add_finding(
+        if self._data_store:
+            return self._data_store.add_finding(
                 self.scan_id,
                 severity=severity,
                 title=title,
@@ -236,9 +254,23 @@ class BaseScanner(ABC):
                 affected_url=affected_url,
                 scanner=self.scanner_name,
             )
-        except Exception:
-            logger.exception("Failed to write finding to Firestore")
-            return ""
+        else:
+            try:
+                return firebase_client.add_finding(
+                    self.scan_id,
+                    severity=severity,
+                    title=title,
+                    description=description,
+                    evidence=evidence,
+                    remediation=remediation,
+                    owasp_category=owasp_category,
+                    cvss_score=cvss_score,
+                    affected_url=affected_url,
+                    scanner=self.scanner_name,
+                )
+            except Exception:
+                logger.exception("Failed to write finding to Firestore")
+                return ""
 
     def get_remediation_with_code(self, vuln_type: str, text_remediation: str) -> str:
         """Enrich a text remediation with framework-specific code examples.

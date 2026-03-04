@@ -58,24 +58,23 @@ class ZAPScanner(BaseScanner):
 
     scanner_name = "zap_scanner"
 
-    def __init__(self, scan_id: str, project_id: str, domain: str) -> None:
-        super().__init__(scan_id, project_id, domain)
+    def __init__(self, scan_id: str, project_id: str, domain: str, **kwargs) -> None:
+        super().__init__(scan_id, project_id, domain, **kwargs)
 
         # Determine whether active scanning is explicitly requested.
-        # Check the scan document options stored in crawl_data or scan
-        # options that the orchestrator may have set.
         self._active_scan_enabled: bool = False
         try:
-            from engine.orchestrator import firebase_client as _fb
-            _fb._ensure_db()
-            doc = _fb.db.collection("scans").document(scan_id).get()
-            if doc.exists:
-                scan_opts = doc.to_dict()
-                # Support either top-level flag or nested options dict
-                self._active_scan_enabled = bool(
-                    scan_opts.get("zapActiveScan", False)
-                    or scan_opts.get("options", {}).get("zapActiveScan", False)
-                )
+            if self._data_store:
+                scan_opts = self._data_store.get_scan_data(scan_id)
+            else:
+                from engine.orchestrator import firebase_client as _fb
+                _fb._ensure_db()
+                doc = _fb.db.collection("scans").document(scan_id).get()
+                scan_opts = doc.to_dict() if doc.exists else {}
+            self._active_scan_enabled = bool(
+                scan_opts.get("zapActiveScan", False)
+                or scan_opts.get("options", {}).get("zapActiveScan", False)
+            )
         except Exception:
             self._active_scan_enabled = False
 

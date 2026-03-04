@@ -103,8 +103,8 @@ SSRF_EVIDENCE_PATTERNS = [
 class SSRFScanner(BaseScanner):
     scanner_name = "ssrf_scanner"
 
-    def __init__(self, scan_id: str, project_id: str, domain: str) -> None:
-        super().__init__(scan_id, project_id, domain)
+    def __init__(self, scan_id: str, project_id: str, domain: str, **kwargs) -> None:
+        super().__init__(scan_id, project_id, domain, **kwargs)
         # Initialise OAST client for blind SSRF detection
         try:
             self._oast = OASTClient(scan_id=scan_id)
