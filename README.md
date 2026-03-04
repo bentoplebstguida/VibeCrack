@@ -1,6 +1,26 @@
 # VibeCrack
 
-Open source security scanner for web applications. Scan your sites for vulnerabilities in seconds.
+[![CI](https://github.com/bentoplebstguida/VibeCrack/actions/workflows/ci.yml/badge.svg)](https://github.com/bentoplebstguida/VibeCrack/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/vibecrack.svg)](https://pypi.org/project/vibecrack/)
+[![Python](https://img.shields.io/pypi/pyversions/vibecrack.svg)](https://pypi.org/project/vibecrack/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
+
+Open source security scanner for web applications. Run one command against a site you own and get a clear security snapshot in seconds.
+
+## Why People Trust It
+
+- **Safe by default**: rate limiting, same-domain filtering, and non-destructive checks
+- **Simple to audit**: plain Python package, readable output, no mandatory cloud account
+- **Responsible disclosure policy**: documented in [SECURITY.md](SECURITY.md)
+- **Contributor guidelines**: documented in [CONTRIBUTING.md](CONTRIBUTING.md)
+- **CI on every push**: basic install and import checks run in GitHub Actions
+
+## Who It Is For
+
+VibeCrack is built for developers, founders, and operators who want a practical first security check without needing a full security team.
+
+It is **not** a replacement for a manual penetration test, secure code review, or a full application security program.
 
 ## Quick Start
 
@@ -10,6 +30,16 @@ vibecrack https://your-site.com
 ```
 
 That's it. No accounts, no config files, no Docker.
+
+## Responsible Use
+
+Use VibeCrack only against systems you own or have explicit authorization to test.
+
+- It is designed for **authorized** defensive testing
+- It is designed to avoid destructive actions
+- It should not be used for unauthorized scanning, denial of service, or data modification
+
+Read the full policy in [SECURITY.md](SECURITY.md).
 
 ## What It Scans
 
@@ -63,6 +93,14 @@ VibeCrack gives you:
 - **HTML** - Self-contained dark-themed report you can share
 - **PDF** - Professional report (requires `pip install vibecrack[full]`)
 
+## What It Does Not Do
+
+- No exploit chaining or post-exploitation
+- No credential stuffing or brute force attacks
+- No destructive payloads or database modifications
+- No third-party domain scanning outside the target scope
+- No guarantee that "no findings" means "secure"
+
 ## Scoring
 
 Every scan produces a security score from 0 to 100 with grades A+ through F, broken down by category:
@@ -97,6 +135,13 @@ pip install vibecrack[full]
 - **Rate limiting** between requests (configurable delay)
 - **Non-destructive** testing only - no data modification
 - **Same-domain filtering** - won't scan third-party endpoints
+
+## Project Trust Signals
+
+- Vulnerability disclosure process: [SECURITY.md](SECURITY.md)
+- Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Community expectations: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- Pull request checklist: [`.github/pull_request_template.md`](.github/pull_request_template.md)
 
 ## VibeCrack Cloud
 

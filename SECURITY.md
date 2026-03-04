@@ -16,6 +16,31 @@ If you discover a security vulnerability in VibeCrack, please report it responsi
 
 We will acknowledge your report within 48 hours and work on a fix.
 
+## Scope
+
+This policy covers:
+
+- The published `vibecrack` package
+- This GitHub repository
+- Official VibeCrack-maintained reporting and scan logic
+
+This policy does not cover:
+
+- Third-party services or dependencies
+- Self-hosted deployments modified by users
+- Findings obtained from unauthorized use of the tool
+
+## Safe Project Expectations
+
+VibeCrack is intended to be:
+
+- Non-destructive by default
+- Used only on authorized targets
+- Transparent about limitations and false positives
+- Open to responsible security review
+
+If you believe the project violates one of these expectations, report it privately.
+
 ## Responsible Use
 
 VibeCrack is designed for **authorized security testing only**. By using this tool, you agree to:
