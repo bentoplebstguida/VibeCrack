@@ -65,3 +65,24 @@ start_production_engine.ps1
 
 # Windows artifacts
 nul
+
+# ============================================================
+# SaaS / Private (frontend, Firebase, deploy)
+# These live in the private VibeCrackSaaS repo
+# ============================================================
+frontend/
+firebase/
+firebase.json
+.firebaserc
+deploy_cloudrun.sh
+engine/docker/
+engine/orchestrator/main.py
+engine/orchestrator/cloudrun_handler.py
+engine/orchestrator/run_saved_scan.py
+engine/orchestrator/firebase_client.py
+engine/requirements.txt
+
+# CLI output artifacts
+vibecrack_*.json
+vibecrack_*.pdf
+vibecrack_*.html
