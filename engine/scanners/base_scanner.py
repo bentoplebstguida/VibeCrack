@@ -1,5 +1,5 @@
 """
-HackerPA Engine - Base Scanner
+VibeCrack Engine - Base Scanner
 
 Abstract base class that every scanner module must inherit from.
 Provides common helpers for logging, adding findings, and making
@@ -14,7 +14,16 @@ from typing import Any, Optional
 import requests
 
 from engine import config
-from engine.orchestrator import firebase_client
+
+# Lazy import: firebase_client is only available in SaaS mode
+firebase_client = None
+
+def _get_firebase():
+    global firebase_client
+    if firebase_client is None:
+        from engine.orchestrator import firebase_client as _fb
+        firebase_client = _fb
+    return firebase_client
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +132,7 @@ class BaseScanner(ABC):
             self.detected_tech: list[str] = self._data_store.get_detected_tech(scan_id)
         else:
             try:
-                self.detected_tech = firebase_client.get_detected_tech(scan_id)
+                self.detected_tech = _get_firebase().get_detected_tech(scan_id)
             except Exception:
                 self.detected_tech = []
 
@@ -132,7 +141,7 @@ class BaseScanner(ABC):
             self.crawl_data: dict = self._data_store.get_crawl_data(scan_id)
         else:
             try:
-                self.crawl_data = firebase_client.get_crawl_data(scan_id)
+                self.crawl_data = _get_firebase().get_crawl_data(scan_id)
             except Exception:
                 self.crawl_data = {}
 
@@ -185,7 +194,7 @@ class BaseScanner(ABC):
             )
         else:
             try:
-                firebase_client.add_scan_log(
+                _get_firebase().add_scan_log(
                     self.scan_id,
                     level=level,
                     message=message,
@@ -256,7 +265,7 @@ class BaseScanner(ABC):
             )
         else:
             try:
-                return firebase_client.add_finding(
+                return _get_firebase().add_finding(
                     self.scan_id,
                     severity=severity,
                     title=title,
@@ -282,7 +291,7 @@ class BaseScanner(ABC):
             from engine.scanners.remediation_templates import get_remediation_code
             code = get_remediation_code(vuln_type, self.detected_tech)
             if code:
-                return f"{text_remediation}\n\n--- CODIGO PARA CORRIGIR ---\n\n{code}"
+                return f"{text_remediation}\n\n--- FIX CODE ---\n\n{code}"
         except Exception:
             pass
         return text_remediation

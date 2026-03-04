@@ -1,5 +1,5 @@
 """
-HackerPA Engine - Score Calculator
+VibeCrack Engine - Score Calculator
 
 Computes the overall security score (0-100) and per-category sub-scores
 based on the vulnerabilities found during a scan. Also saves score history
@@ -10,7 +10,15 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from engine.orchestrator import firebase_client
+# Lazy import: firebase_client is only available in SaaS mode
+_firebase_client = None
+
+def _get_firebase():
+    global _firebase_client
+    if _firebase_client is None:
+        from engine.orchestrator import firebase_client
+        _firebase_client = firebase_client
+    return _firebase_client
 
 logger = logging.getLogger(__name__)
 
@@ -135,8 +143,9 @@ def calculate(scan_id: str) -> dict[str, Any]:
     scores, an overall weighted score, and saves everything to
     Firestore (scores_history collection + updates scan and project docs).
     """
-    firebase_client._ensure_db()
-    db = firebase_client.db
+    _fb = _get_firebase()
+    _fb._ensure_db()
+    db = _fb.db
 
     # 1. Get scan document
     scan_ref = db.collection("scans").document(scan_id)

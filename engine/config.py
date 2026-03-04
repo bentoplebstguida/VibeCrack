@@ -1,5 +1,5 @@
 """
-HackerPA Engine - Configuration
+VibeCrack Engine - Configuration
 """
 
 import os
@@ -7,16 +7,13 @@ import os
 # Run mode: "listener" (local Firestore watcher) or "cloudrun" (HTTP handler)
 RUN_MODE = os.environ.get("RUN_MODE", "listener")
 
-# Firebase
+# Firebase (SaaS mode only -- set via environment variables)
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIREBASE_CREDENTIALS_PATH = os.environ.get(
     "FIREBASE_CREDENTIALS_PATH",
-    os.path.join(_PROJECT_ROOT, "serviceAccountKey.json")
+    os.path.join(_PROJECT_ROOT, "serviceAccountKey.json"),
 )
-FIREBASE_STORAGE_BUCKET = os.environ.get(
-    "FIREBASE_STORAGE_BUCKET",
-    "hackerpa-b6c1b.firebasestorage.app"
-)
+FIREBASE_STORAGE_BUCKET = os.environ.get("FIREBASE_STORAGE_BUCKET", "")
 
 # Scan Settings
 _default_timeout = "180" if RUN_MODE == "cloudrun" else "300"
@@ -25,7 +22,7 @@ MAX_CONCURRENT_SCANS = int(os.environ.get("MAX_CONCURRENT_SCANS", "3"))
 REQUEST_DELAY = float(os.environ.get("REQUEST_DELAY", "0.5"))  # delay between requests
 
 # User Agent
-USER_AGENT = "HackerPA Security Scanner/1.0"
+USER_AGENT = "VibeCrack Security Scanner/1.0"
 
 # Directory Scanner - paths to check
 SENSITIVE_PATHS = [
@@ -110,67 +107,67 @@ SECURITY_HEADERS = {
     "Strict-Transport-Security": {
         "required": True,
         "severity": "high",
-        "description": "HSTS protege contra ataques man-in-the-middle forcando HTTPS",
+        "description": "HSTS protects against man-in-the-middle attacks by enforcing HTTPS",
     },
     "Content-Security-Policy": {
         "required": True,
         "severity": "high",
-        "description": "CSP previne XSS controlando quais recursos podem ser carregados",
+        "description": "CSP prevents XSS by controlling which resources can be loaded",
     },
     "X-Content-Type-Options": {
         "required": True,
         "severity": "medium",
-        "description": "Previne MIME-type sniffing",
+        "description": "Prevents MIME-type sniffing",
         "expected": "nosniff",
     },
     "X-Frame-Options": {
         "required": True,
         "severity": "medium",
-        "description": "Protege contra clickjacking",
+        "description": "Protects against clickjacking",
     },
     "X-XSS-Protection": {
         "required": False,
         "severity": "low",
-        "description": "Filtro XSS do navegador (legado, CSP e preferivel)",
+        "description": "Legacy browser XSS filter (CSP is preferred)",
     },
     "Referrer-Policy": {
         "required": True,
         "severity": "low",
-        "description": "Controla quais informacoes de referrer sao enviadas",
+        "description": "Controls what referrer information is sent with requests",
     },
     "Permissions-Policy": {
         "required": True,
         "severity": "medium",
-        "description": "Controla quais APIs do navegador o site pode usar",
+        "description": "Controls which browser APIs the site can use",
     },
     "X-Permitted-Cross-Domain-Policies": {
         "required": False,
         "severity": "low",
-        "description": "Controla como Flash e PDFs podem acessar o dominio",
+        "description": "Controls how Flash and PDFs can access the domain",
     },
     "Cross-Origin-Opener-Policy": {
         "required": False,
         "severity": "low",
-        "description": "Isola o contexto de navegacao",
+        "description": "Isolates the browsing context",
     },
     "Cross-Origin-Resource-Policy": {
         "required": False,
         "severity": "low",
-        "description": "Protege recursos contra leitura cross-origin",
+        "description": "Protects resources from cross-origin reads",
     },
 }
 
 # XSS Payloads for testing
 XSS_PAYLOADS = [
-    '<script>alert("HackerPA")</script>',
-    '"><script>alert("HackerPA")</script>',
-    "'-alert('HackerPA')-'",
-    '<img src=x onerror=alert("HackerPA")>',
-    '<svg onload=alert("HackerPA")>',
-    '"><img src=x onerror=alert("HackerPA")>',
-    "javascript:alert('HackerPA')",
-    '<body onload=alert("HackerPA")>',
-    '<iframe src="javascript:alert(\'HackerPA\')">',
+    '<script>alert("VibeCrack")</script>',
+    '"><script>alert("VibeCrack")</script>',
+    "'-alert('VibeCrack')-'",
+    '<img src=x onerror=alert("VibeCrack")>',
+    '<svg onload=alert("VibeCrack")>',
+    '"><img src=x onerror=alert("VibeCrack")>',
+    "javascript:alert('VibeCrack')",
+    '<body onload=alert("VibeCrack")>',
+    '<iframe src="javascript:alert(\'VibeCrack\')">',
     "{{constructor.constructor('alert(1)')()}}",
 ]
 

@@ -1,5 +1,5 @@
 """
-HackerPA Engine - Reconnaissance Scanner
+VibeCrack Engine - Reconnaissance Scanner
 
 Performs initial reconnaissance: technology detection, subdomain discovery,
 HTTP fingerprinting, and information gathering.
@@ -10,8 +10,7 @@ from urllib.parse import urlparse, urljoin
 
 from bs4 import BeautifulSoup
 
-from engine.orchestrator import firebase_client
-from engine.scanners.base_scanner import BaseScanner
+from engine.scanners.base_scanner import BaseScanner, _get_firebase
 
 
 # Common technology signatures in headers and HTML
@@ -97,20 +96,20 @@ class ReconScanner(BaseScanner):
                 if self._data_store:
                     self._data_store.save_detected_tech(self.scan_id, unique_tech)
                 else:
-                    firebase_client.save_detected_tech(self.scan_id, unique_tech)
+                    _get_firebase().save_detected_tech(self.scan_id, unique_tech)
             except Exception:
                 self.log("warning", "Could not save detected tech")
             self.log("info", f"Detected technologies: {', '.join(unique_tech)}")
             self.add_finding(
                 severity="info",
-                title="Tecnologias detectadas",
-                description=f"As seguintes tecnologias foram identificadas: {', '.join(unique_tech)}. "
-                            f"Conhecer o stack permite buscar CVEs especificos.",
+                title="Detected technologies",
+                description=f"The following technologies were identified: {', '.join(unique_tech)}. "
+                            f"Knowing the stack enables searching for specific CVEs.",
                 evidence={
                     "url": self.base_url,
                     "response_snippet": f"Technologies: {', '.join(unique_tech)}",
                 },
-                remediation="Minimize a exposicao de informacoes sobre seu stack. Remova headers como X-Powered-By e Server.",
+                remediation="Minimize stack information exposure. Remove headers like X-Powered-By and Server.",
                 owasp_category="A05:2021 - Security Misconfiguration",
                 affected_url=self.base_url,
             )
@@ -169,10 +168,10 @@ class ReconScanner(BaseScanner):
                 if tech_name == "WordPress XMLRPC":
                     self.add_finding(
                         severity="medium",
-                        title="WordPress XML-RPC ativo",
-                        description="O XML-RPC do WordPress esta ativo. Pode ser usado para ataques de brute force e DDoS amplification.",
+                        title="WordPress XML-RPC active",
+                        description="WordPress XML-RPC is active. Can be used for brute force attacks and DDoS amplification.",
                         evidence={"url": url, "response_snippet": f"Status: {response.status_code}"},
-                        remediation="Desabilite XML-RPC se nao for necessario. Adicione: add_filter('xmlrpc_enabled', '__return_false');",
+                        remediation="Disable XML-RPC if not needed. Add: add_filter('xmlrpc_enabled', '__return_false');",
                         owasp_category="A05:2021 - Security Misconfiguration",
                         cvss_score=5.0,
                         affected_url=url,
@@ -180,10 +179,10 @@ class ReconScanner(BaseScanner):
                 elif tech_name == "GraphQL":
                     self.add_finding(
                         severity="medium",
-                        title="Endpoint GraphQL descoberto",
-                        description="Endpoint GraphQL acessivel. Pode permitir introspection queries que revelam todo o schema da API.",
+                        title="GraphQL endpoint discovered",
+                        description="GraphQL endpoint is accessible. May allow introspection queries that reveal the entire API schema.",
                         evidence={"url": url, "response_snippet": f"Status: {response.status_code}"},
-                        remediation="Desabilite GraphQL introspection em producao. Implemente rate limiting e autenticacao.",
+                        remediation="Disable GraphQL introspection in production. Implement rate limiting and authentication.",
                         owasp_category="A01:2021 - Broken Access Control",
                         cvss_score=5.0,
                         affected_url=url,
@@ -200,11 +199,11 @@ class ReconScanner(BaseScanner):
             if found_dangerous:
                 self.add_finding(
                     severity="medium",
-                    title=f"Metodos HTTP perigosos habilitados: {', '.join(found_dangerous)}",
-                    description=f"O servidor permite os metodos HTTP: {allowed}. "
-                                f"Metodos como TRACE e PUT podem ser explorados.",
+                    title=f"Dangerous HTTP methods enabled: {', '.join(found_dangerous)}",
+                    description=f"The server allows HTTP methods: {allowed}. "
+                                f"Methods like TRACE and PUT can be exploited.",
                     evidence={"url": self.base_url, "response_snippet": f"Allow: {allowed}"},
-                    remediation="Desabilite metodos HTTP desnecessarios no web server. Permita apenas GET, POST, HEAD.",
+                    remediation="Disable unnecessary HTTP methods on the web server. Allow only GET, POST, HEAD.",
                     owasp_category="A05:2021 - Security Misconfiguration",
                     cvss_score=4.0,
                     affected_url=self.base_url,
@@ -216,24 +215,24 @@ class ReconScanner(BaseScanner):
             issues = []
 
             if not cookie.secure:
-                issues.append("Secure flag ausente")
+                issues.append("Secure flag missing")
             if "httponly" not in str(cookie._rest).lower():
-                issues.append("HttpOnly flag ausente")
+                issues.append("HttpOnly flag missing")
             if not cookie.has_nonstandard_attr("SameSite"):
-                issues.append("SameSite ausente")
+                issues.append("SameSite missing")
 
             if issues:
                 self.add_finding(
                     severity="medium" if "Secure" in str(issues) else "low",
-                    title=f"Cookie inseguro: {cookie.name}",
-                    description=f"O cookie '{cookie.name}' tem problemas de seguranca: {', '.join(issues)}. "
-                                f"Isso pode permitir roubo de sessao ou ataques CSRF.",
+                    title=f"Insecure cookie: {cookie.name}",
+                    description=f"The cookie '{cookie.name}' has security issues: {', '.join(issues)}. "
+                                f"This may allow session hijacking or CSRF attacks.",
                     evidence={
                         "url": self.base_url,
                         "response_snippet": f"Cookie: {cookie.name}, Issues: {', '.join(issues)}",
                     },
                     remediation=self.get_remediation_with_code("cookies",
-                        "Configure cookies com: Secure (apenas HTTPS), HttpOnly (inacessivel por JS), SameSite=Strict ou Lax."),
+                        "Set cookies with: Secure (HTTPS only), HttpOnly (inaccessible to JS), SameSite=Strict or Lax."),
                     owasp_category="A05:2021 - Security Misconfiguration",
                     cvss_score=4.0,
                     affected_url=self.base_url,

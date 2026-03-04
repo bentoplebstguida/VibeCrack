@@ -1,5 +1,5 @@
 """
-HackerPA Engine - Secrets Scanner
+VibeCrack Engine - Secrets Scanner
 
 Scrapes the frontend HTML and JavaScript bundles looking for hardcoded
 API keys, tokens, passwords, database connection strings, and other secrets.
@@ -200,18 +200,18 @@ class SecretsScanner(BaseScanner):
                     self.add_finding(
                         severity=severity,
                         title=self._classify_title(pattern),
-                        description=f"Um secret/token foi encontrado exposto no codigo fonte acessivel publicamente. "
-                                    f"Atacantes podem usar isso para acessar servicos, bancos de dados ou APIs.",
+                        description=f"A secret/token was found exposed in publicly accessible source code. "
+                                    f"Attackers can use this to access services, databases, or APIs.",
                         evidence={
                             "url": source_url,
                             "payload": masked,
                             "response_snippet": self._mask_context(context),
                         },
                         remediation=self.get_remediation_with_code("secrets",
-                            "1. Revogue o secret/token imediatamente.\n"
-                            "2. Mova para variaveis de ambiente (process.env / .env).\n"
-                            "3. Nunca inclua secrets no codigo frontend.\n"
-                            "4. Use um gerenciador de secrets (Vault, AWS Secrets Manager, etc)."),
+                            "1. Revoke the secret/token immediately.\n"
+                            "2. Move to environment variables (process.env / .env).\n"
+                            "3. Never include secrets in frontend code.\n"
+                            "4. Use a secrets manager (Vault, AWS Secrets Manager, etc)."),
                         owasp_category="A02:2021 - Cryptographic Failures",
                         cvss_score=8.5 if severity == "critical" else 6.5,
                         affected_url=source_url,
@@ -268,28 +268,28 @@ class SecretsScanner(BaseScanner):
         pattern_lower = pattern.lower()
 
         if "private.key" in pattern_lower or "PRIVATE KEY" in pattern:
-            return "Chave privada exposta no frontend"
+            return "Private key exposed in frontend"
         if "password" in pattern_lower or "passwd" in pattern_lower:
-            return "Senha hardcoded encontrada no codigo"
+            return "Hardcoded password found in code"
         if "mongodb" in pattern_lower or "postgres" in pattern_lower or "mysql" in pattern_lower:
-            return "String de conexao de banco de dados exposta"
+            return "Exposed database connection string"
         if "aws" in pattern_lower:
-            return "Credencial AWS exposta"
+            return "Exposed AWS credential"
         if "stripe" in pattern_lower or "sk_live" in pattern_lower or "sk-live" in pattern_lower:
-            return "Chave Stripe exposta"
+            return "Exposed Stripe key"
         if "github" in pattern_lower or "ghp_" in pattern_lower:
-            return "Token GitHub exposto"
+            return "Exposed GitHub token"
         if "slack" in pattern_lower or "xox" in pattern_lower:
-            return "Token Slack exposto"
+            return "Exposed Slack token"
         if "firebase" in pattern_lower or "AIza" in pattern:
-            return "Chave Google/Firebase exposta"
+            return "Exposed Google/Firebase key"
         if "jwt" in pattern_lower or "eyJ" in pattern:
-            return "JWT Token exposto no frontend"
+            return "JWT token exposed in frontend"
         if "api.key" in pattern_lower or "api_key" in pattern_lower:
-            return "API Key exposta no codigo fonte"
+            return "API key exposed in source code"
         if "api.secret" in pattern_lower or "secret" in pattern_lower:
-            return "API Secret exposto no codigo fonte"
+            return "API secret exposed in source code"
         if "token" in pattern_lower:
-            return "Token de acesso exposto no frontend"
+            return "Access token exposed in frontend"
 
-        return "Secret/credencial exposta no codigo fonte"
+        return "Secret/credential exposed in source code"

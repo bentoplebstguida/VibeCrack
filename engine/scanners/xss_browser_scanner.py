@@ -1,5 +1,5 @@
 """
-HackerPA Engine - Browser-Based XSS Scanner (Playwright)
+VibeCrack Engine - Browser-Based XSS Scanner (Playwright)
 
 Confirms reflected and DOM-based XSS vulnerabilities by injecting payloads
 into a real headless Chromium browser and monitoring for JavaScript execution
@@ -227,7 +227,7 @@ class XSSBrowserScanner(BaseScanner):
 
     def _new_context(self, browser: Any) -> Any:
         """Create a fresh browser context with a reasonable viewport and
-        the HackerPA user-agent."""
+        the VibeCrack user-agent."""
         from engine import config
 
         return browser.new_context(

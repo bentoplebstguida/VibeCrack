@@ -1,5 +1,5 @@
 """
-HackerPA Engine - Access Control / BOLA / BFLA / IDOR Scanner
+VibeCrack Engine - Access Control / BOLA / BFLA / IDOR Scanner
 
 Tests for broken access control vulnerabilities -- the #1 risk in the
 OWASP Top 10 (A01:2021).  Specifically:
@@ -20,8 +20,7 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 
-from engine.scanners.base_scanner import BaseScanner
-from engine.orchestrator import firebase_client
+from engine.scanners.base_scanner import BaseScanner, _get_firebase
 
 
 # ====================================================================
@@ -203,7 +202,7 @@ class AccessControlScanner(BaseScanner):
         try:
             if self._data_store:
                 return self._data_store.get_crawl_data(self.scan_id)
-            doc = firebase_client.db.collection("scans").document(self.scan_id).get()
+            doc = _get_firebase().db.collection("scans").document(self.scan_id).get()
             if doc.exists:
                 data = doc.to_dict()
                 return data.get("crawlData", {}) or {}

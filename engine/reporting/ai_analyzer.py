@@ -1,5 +1,5 @@
 """
-HackerPA Engine - AI Analyzer (Claude API)
+VibeCrack Engine - AI Analyzer (Claude API)
 
 Uses the Anthropic Claude API to generate:
 1. A comprehensive security analysis (AI Summary)
@@ -20,94 +20,100 @@ from urllib.parse import urlparse
 
 import requests
 
-import anthropic
+# Lazy imports: anthropic and firebase_client may not be installed/available
+_firebase_client = None
 
-from engine.orchestrator import firebase_client
+def _get_firebase():
+    global _firebase_client
+    if _firebase_client is None:
+        from engine.orchestrator import firebase_client
+        _firebase_client = firebase_client
+    return _firebase_client
 
 logger = logging.getLogger(__name__)
 
 MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 8192
 
-SYSTEM_PROMPT = """Voce e um analista de seguranca cibernetica senior especializado em pentesting e analise de vulnerabilidades web. Voce esta analisando os resultados de um scan automatizado do HackerPA.
+SYSTEM_PROMPT = """You are a senior cybersecurity analyst specialized in pentesting and web vulnerability analysis. You are analyzing the results of an automated VibeCrack scan.
 
-O usuario e um desenvolvedor com conhecimento tecnico limitado ("vibe coder") que precisa de orientacao clara e pratica.
+The user is a developer with limited technical knowledge ("vibe coder") who needs clear and practical guidance.
 
-Analise os dados do scan fornecidos e gere DOIS blocos de texto, separados EXATAMENTE pela linha:
+Analyze the provided scan data and generate TWO text blocks, separated EXACTLY by the line:
 ---PLAYBOOK---
 
-=== BLOCO 1: ANALISE DE SEGURANCA ===
+=== BLOCK 1: SECURITY ANALYSIS ===
 
-Gere um relatorio completo em Markdown com estas secoes:
+Generate a complete Markdown report with these sections:
 
-# Analise de Seguranca - [dominio]
+# Security Analysis - [domain]
 
-## Resumo Executivo
-2-3 paragrafos em linguagem SIMPLES explicando a situacao geral de seguranca. Sem jargao tecnico desnecessario.
+## Executive Summary
+2-3 paragraphs in SIMPLE language explaining the overall security situation. No unnecessary technical jargon.
 
-## Score: [score]/100 (Grau [grade])
-Explique o que esse score significa na pratica.
+## Score: [score]/100 (Grade [grade])
+Explain what this score means in practice.
 
-## Secrets e Credenciais Expostos
-LISTA COMPLETA de TODOS os secrets, tokens, senhas, API keys encontrados. Para CADA um:
-- **Tipo**: (API Key, Token, Senha, etc.)
-- **URL onde foi encontrado**: URL exata
-- **Valor encontrado**: O valor completo do secret/token como aparece no scan
-- **Risco**: O que um atacante pode fazer com isso
+## Exposed Secrets and Credentials
+COMPLETE LIST of ALL secrets, tokens, passwords, API keys found. For EACH one:
+- **Type**: (API Key, Token, Password, etc.)
+- **URL where it was found**: Exact URL
+- **Value found**: The complete value of the secret/token as it appears in the scan
+- **Risk**: What an attacker can do with this
 
-Se nenhum secret foi encontrado, diga "Nenhum secret exposto encontrado."
+If no secrets were found, say "No exposed secrets found."
 
-## Top 5 Problemas Mais Urgentes
-Para cada um:
-1. O que e o problema (1 frase)
-2. Por que e perigoso (1 frase)
-3. Como corrigir com CODIGO PRONTO para copiar e colar
+## Top 5 Most Urgent Issues
+For each one:
+1. What the problem is (1 sentence)
+2. Why it is dangerous (1 sentence)
+3. How to fix it with READY-TO-USE code to copy and paste
 
-## Analise por Categoria
-Para cada categoria do score (SSL, Headers, Injection, etc.):
-- Score da categoria
-- O que foi encontrado
-- Recomendacao pratica
+## Analysis by Category
+For each score category (SSL, Headers, Injection, etc.):
+- Category score
+- What was found
+- Practical recommendation
 
-## Todas as Vulnerabilidades
-Lista completa de TODAS as vulnerabilidades encontradas, organizadas por severidade.
+## All Vulnerabilities
+Complete list of ALL vulnerabilities found, organized by severity.
 
-=== BLOCO 2: PLAYBOOK DE EXPLORACAO (JA EXECUTADO) ===
+=== BLOCK 2: EXPLOIT PLAYBOOK (ALREADY EXECUTED) ===
 
-Os comandos de verificacao JA FORAM EXECUTADOS automaticamente. Os resultados reais estao no campo "proofResult" de cada vulnerabilidade.
+The verification commands have ALREADY BEEN EXECUTED automatically. The real results are in the "proofResult" field of each vulnerability.
 
-Gere um playbook em Markdown que mostra os RESULTADOS REAIS:
+Generate a Markdown playbook that shows the REAL RESULTS:
 
-# Playbook de Exploracao - [dominio]
+# Exploit Playbook - [domain]
 
-> AVISO: Use APENAS em aplicacoes que voce tem AUTORIZACAO para testar.
+> WARNING: Use ONLY on applications you have AUTHORIZATION to test.
 
-Para CADA vulnerabilidade que tem "proofResult" (organize por severidade):
+For EACH vulnerability that has "proofResult" (organize by severity):
 
-### [SEVERIDADE] [titulo]
-**URL**: [url afetada]
+### [SEVERITY] [title]
+**URL**: [affected url]
 
-**Comando executado:**
+**Command executed:**
 ```bash
-[o comando que foi executado - campo proofResult.command]
+[the command that was executed - proofResult.command field]
 ```
 
-**Resultado REAL obtido:**
+**ACTUAL result obtained:**
 ```
-[a saida real do comando - campo proofResult.output]
+[the real command output - proofResult.output field]
 ```
 
-**Analise do resultado:**
-[Explique o que esse resultado PROVA sobre a vulnerabilidade. Seja especifico sobre o que esta errado na resposta.]
+**Result analysis:**
+[Explain what this result PROVES about the vulnerability. Be specific about what is wrong in the response.]
 
-**Como corrigir:**
-[Codigo pronto para corrigir]
+**How to fix:**
+[Ready-to-use code to fix]
 
 ---
 
-Para vulnerabilidades SEM proofResult, mostre o comando que o usuario pode rodar manualmente.
+For vulnerabilities WITHOUT proofResult, show the command that the user can run manually.
 
-IMPORTANTE: Foque nos resultados REAIS. Nao invente resultados. Use EXATAMENTE o que esta em proofResult.output."""
+IMPORTANT: Focus on REAL results. Do not fabricate results. Use EXACTLY what is in proofResult.output."""
 
 
 def generate_ai_analysis(scan_id: str, *, data_store=None) -> dict[str, str]:
@@ -132,6 +138,7 @@ def generate_ai_analysis(scan_id: str, *, data_store=None) -> dict[str, str]:
 
     logger.info("Calling Claude API for scan %s analysis...", scan_id)
 
+    import anthropic
     client = anthropic.Anthropic(api_key=api_key)
 
     message = client.messages.create(
@@ -141,7 +148,7 @@ def generate_ai_analysis(scan_id: str, *, data_store=None) -> dict[str, str]:
         messages=[
             {
                 "role": "user",
-                "content": f"Aqui estao os dados completos do scan de seguranca, incluindo os resultados REAIS dos comandos de verificacao (campo proofResult). Analise tudo e gere o relatorio + playbook:\n\n```json\n{json.dumps(scan_data, indent=2, default=str, ensure_ascii=False)}\n```",
+                "content": f"Here are the complete security scan data, including the REAL verification command results (proofResult field). Analyze everything and generate the report + playbook:\n\n```json\n{json.dumps(scan_data, indent=2, default=str, ensure_ascii=False)}\n```",
             }
         ],
     )
@@ -275,7 +282,7 @@ def _proof_directory(url: str) -> dict[str, str]:
     status_line = f"HTTP {resp.status_code}"
     content_type = resp.headers.get("Content-Type", "unknown")
     body_snippet = resp.text[:500] if resp.text else "(empty)"
-    output = f"{status_line}\nContent-Type: {content_type}\nContent-Length: {len(resp.content)}\n\n--- Body (primeiros 500 chars) ---\n{body_snippet}"
+    output = f"{status_line}\nContent-Type: {content_type}\nContent-Length: {len(resp.content)}\n\n--- Body (first 500 chars) ---\n{body_snippet}"
     return {
         "command": f"curl -s {url}",
         "output": output[:2000],
@@ -320,9 +327,9 @@ def _proof_xss(url: str, evidence: dict) -> dict[str, str]:
     """Verify XSS by checking if payload is reflected."""
     payload = evidence.get("payload", "") if isinstance(evidence, dict) else ""
     resp = requests.get(url, timeout=10, verify=False)
-    reflected = "SIM - PAYLOAD REFLETIDO!" if payload and payload in resp.text else "Nao refletido nesta verificacao"
+    reflected = "YES - PAYLOAD REFLECTED!" if payload and payload in resp.text else "Not reflected in this check"
     body_snippet = resp.text[:500]
-    output = f"HTTP {resp.status_code}\nPayload refletido: {reflected}\n\n--- Resposta ---\n{body_snippet}"
+    output = f"HTTP {resp.status_code}\nPayload reflected: {reflected}\n\n--- Response ---\n{body_snippet}"
     return {
         "command": f"curl -s \"{url}\"",
         "output": output[:2000],
@@ -356,7 +363,7 @@ def _proof_csrf(url: str) -> dict[str, str]:
     body_lower = resp.text.lower()
     has_csrf = any(t in body_lower for t in ["csrf", "_token", "authenticity_token"])
     cookie_headers = [f"Set-Cookie: {v}" for k, v in resp.headers.items() if k.lower() == "set-cookie"]
-    output = f"HTTP {resp.status_code}\nCSRF token no HTML: {'SIM' if has_csrf else 'NAO ENCONTRADO'}\n\nCookies:\n" + ("\n".join(cookie_headers) if cookie_headers else "Nenhum cookie")
+    output = f"HTTP {resp.status_code}\nCSRF token in HTML: {'YES' if has_csrf else 'NOT FOUND'}\n\nCookies:\n" + ("\n".join(cookie_headers) if cookie_headers else "No cookies")
     return {
         "command": f"curl -s {url} | grep -i 'csrf\\|_token'",
         "output": output[:2000],
@@ -375,7 +382,7 @@ def _proof_subdomain(url: str, title: str) -> dict[str, str]:
         except Exception:
             output = f"DNS: {hostname} -> {ip}\nHTTP: Connection failed"
     except socket.gaierror:
-        output = f"DNS: {hostname} -> NXDOMAIN (nao resolve)"
+        output = f"DNS: {hostname} -> NXDOMAIN (does not resolve)"
     return {
         "command": f"dig +short {hostname} && curl -s -o /dev/null -w '%{{http_code}}' {url}",
         "output": output[:2000],
@@ -394,8 +401,9 @@ def _gather_scan_data(scan_id: str, *, data_store=None) -> dict[str, Any]:
         vulns_raw = combined.get("vulnerabilities", [])
         score_data = combined.get("score_data") or None
     else:
-        firebase_client._ensure_db()
-        db = firebase_client.db
+        _fb = _get_firebase()
+        _fb._ensure_db()
+        db = _fb.db
 
         scan_doc = db.collection("scans").document(scan_id).get()
         if not scan_doc.exists:

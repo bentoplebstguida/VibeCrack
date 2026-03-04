@@ -6,6 +6,9 @@ Usage:
     vibecrack https://example.com --modules ssl,headers,xss,sqli
     vibecrack https://example.com --quick
     vibecrack https://example.com --json results.json --html report.html
+    vibecrack https://example.com --api-key sk-ant-... --pdf report.pdf
+    vibecrack --list-modules
+    vibecrack --version
 """
 
 import argparse
@@ -15,6 +18,8 @@ import os
 import sys
 import uuid
 from datetime import datetime, timezone
+
+from engine.cli_output import VERSION
 
 # ---------------------------------------------------------------------------
 # Module sets
@@ -69,6 +74,20 @@ def _check_optional_dep(module_name: str) -> bool:
     return True
 
 
+def _list_modules():
+    """Print all available scanner modules and exit."""
+    from engine.orchestrator.job_manager import SCANNER_REGISTRY
+    print("Available scanner modules:\n")
+    for name in sorted(SCANNER_REGISTRY):
+        dep = _OPTIONAL_DEP_MODULES.get(name)
+        avail = _check_optional_dep(name)
+        status = "available" if avail else f"requires: pip install {dep}"
+        marker = "[x]" if avail else "[ ]"
+        print(f"  {marker} {name:20s} {status}")
+    print(f"\nQuick scan modules: {', '.join(QUICK_MODULES)}")
+    print(f"Full scan modules:  {', '.join(FULL_MODULES)}")
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         prog="vibecrack",
@@ -77,6 +96,7 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "target",
+        nargs="?",
         help="Target URL to scan (e.g. https://example.com)",
     )
     parser.add_argument(
@@ -107,6 +127,23 @@ def parse_args(argv=None):
         help="Generate a PDF report (requires reportlab)",
     )
     parser.add_argument(
+        "--api-key",
+        metavar="KEY",
+        help="Anthropic API key for AI-powered analysis (or set ANTHROPIC_API_KEY env var)",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        metavar="SECONDS",
+        help="Per-request timeout in seconds (default: 300)",
+    )
+    parser.add_argument(
+        "--delay",
+        type=float,
+        metavar="SECONDS",
+        help="Delay between requests in seconds (default: 0.5)",
+    )
+    parser.add_argument(
         "--no-color",
         action="store_true",
         help="Disable colored output",
@@ -115,6 +152,16 @@ def parse_args(argv=None):
         "--verbose", "-v",
         action="store_true",
         help="Show detailed scanner logs",
+    )
+    parser.add_argument(
+        "--version", "-V",
+        action="version",
+        version=f"%(prog)s {VERSION}",
+    )
+    parser.add_argument(
+        "--list-modules",
+        action="store_true",
+        help="List all available scanner modules and exit",
     )
     return parser.parse_args(argv)
 
@@ -160,6 +207,17 @@ def _write_json(path: str, store, scan_id: str, score_data: dict) -> None:
 def main(argv=None):
     args = parse_args(argv)
 
+    # Handle --list-modules early
+    if args.list_modules:
+        _list_modules()
+        sys.exit(0)
+
+    # Validate target is provided
+    if not args.target:
+        print("Error: target URL is required (e.g. vibecrack https://example.com)")
+        print("Use --help for usage information.")
+        sys.exit(1)
+
     # Setup logging
     log_level = logging.DEBUG if args.verbose else logging.WARNING
     logging.basicConfig(
@@ -167,6 +225,18 @@ def main(argv=None):
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%H:%M:%S",
     )
+
+    # Apply --api-key
+    if args.api_key:
+        os.environ["ANTHROPIC_API_KEY"] = args.api_key
+
+    # Apply --timeout and --delay
+    if args.timeout or args.delay:
+        from engine import config
+        if args.timeout:
+            config.SCAN_TIMEOUT = args.timeout
+        if args.delay:
+            config.REQUEST_DELAY = args.delay
 
     # Initialize CLI output
     from engine.cli_output import CLIOutput

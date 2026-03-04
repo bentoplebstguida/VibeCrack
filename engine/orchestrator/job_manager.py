@@ -1,5 +1,5 @@
 """
-HackerPA Engine - Job Manager
+VibeCrack Engine - Job Manager
 
 Orchestrates the execution of scanner modules for a single scan job.
 Each scanner runs sequentially; a failure in one scanner does not prevent
@@ -11,9 +11,17 @@ import logging
 import traceback
 from typing import Any
 
-from engine.orchestrator import firebase_client
-
 logger = logging.getLogger(__name__)
+
+# Lazy import: firebase_client is only available in SaaS mode
+_firebase_client = None
+
+def _get_firebase():
+    global _firebase_client
+    if _firebase_client is None:
+        from engine.orchestrator import firebase_client
+        _firebase_client = firebase_client
+    return _firebase_client
 
 # Maps logical module names (as stored in the scan document) to their
 # fully-qualified Python module paths and class names.
@@ -115,7 +123,7 @@ class JobManager:
                 extra_fields=extra_fields,
             )
         else:
-            firebase_client.update_scan_status(
+            _get_firebase().update_scan_status(
                 self.scan_id, status,
                 progress=progress, current_phase=current_phase,
                 extra_fields=extra_fields,
@@ -125,7 +133,7 @@ class JobManager:
         if self.data_store:
             self.data_store.update_scan_progress(self.scan_id, progress, current_phase)
         else:
-            firebase_client.update_scan_progress(self.scan_id, progress, current_phase)
+            _get_firebase().update_scan_progress(self.scan_id, progress, current_phase)
 
     def _add_log(self, *, level="info", message="", details=None, scanner=""):
         if self.data_store:
@@ -134,7 +142,7 @@ class JobManager:
                 details=details, scanner=scanner,
             )
         else:
-            firebase_client.add_scan_log(
+            _get_firebase().add_scan_log(
                 self.scan_id, level=level, message=message,
                 details=details, scanner=scanner,
             )
@@ -168,7 +176,7 @@ class JobManager:
             # Check if scan was cancelled by the user
             if self._is_cancelled():
                 logger.info("Scan %s was cancelled by user", self.scan_id)
-                self._add_log(level="info", message="Scan cancelado pelo usuario")
+                self._add_log(level="info", message="Scan cancelled by user")
                 self._update_status(
                     "cancelled",
                     progress=self._progress(completed, total),
@@ -242,7 +250,7 @@ class JobManager:
         if self.data_store:
             return self.data_store.is_scan_cancelled(self.scan_id)
         try:
-            doc = firebase_client.db.collection("scans").document(self.scan_id).get()
+            doc = _get_firebase().db.collection("scans").document(self.scan_id).get()
             if doc.exists:
                 return doc.to_dict().get("status") == "cancelled"
         except Exception:

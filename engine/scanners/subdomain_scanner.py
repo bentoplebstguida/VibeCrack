@@ -1,5 +1,5 @@
 """
-HackerPA Engine - Subdomain Discovery Scanner
+VibeCrack Engine - Subdomain Discovery Scanner
 
 Discovers subdomains that may be forgotten or misconfigured (dev, staging,
 test environments) using DNS brute-forcing and certificate transparency logs.
@@ -69,15 +69,15 @@ class SubdomainScanner(BaseScanner):
             self.log("warning", f"Wildcard DNS detected for {base_domain} - skipping DNS brute-force")
             self.add_finding(
                 severity="info",
-                title=f"Wildcard DNS detectado: *.{base_domain}",
+                title=f"Wildcard DNS detected: *.{base_domain}",
                 description=(
-                    f"O dominio {base_domain} usa DNS wildcard, ou seja, qualquer subdominio "
-                    f"(ex: xyz123.{base_domain}) resolve para um IP. Isso e comum em "
-                    f"plataformas como Cloud Run, Vercel, Netlify, etc. "
-                    f"A enumeracao de subdominios via DNS nao e eficaz neste caso."
+                    f"The domain {base_domain} uses wildcard DNS, meaning any subdomain "
+                    f"(e.g., xyz123.{base_domain}) resolves to an IP. This is common on "
+                    f"platforms like Cloud Run, Vercel, Netlify, etc. "
+                    f"Subdomain enumeration via DNS is not effective in this case."
                 ),
                 evidence={"url": f"*.{base_domain}"},
-                remediation="Wildcard DNS e normal para plataformas cloud. Nenhuma acao necessaria.",
+                remediation="Wildcard DNS is normal for cloud platforms. No action required.",
                 owasp_category="A05:2021 - Security Misconfiguration",
                 cvss_score=0.0,
                 affected_url=self.base_url,
@@ -170,16 +170,16 @@ class SubdomainScanner(BaseScanner):
             if response is not None:
                 severity = "high" if is_risky else "info"
                 title = (
-                    f"Ambiente de desenvolvimento/teste exposto: {subdomain}"
+                    f"Development/test environment exposed: {subdomain}"
                     if is_risky
-                    else f"Subdominio ativo descoberto: {subdomain}"
+                    else f"Active subdomain discovered: {subdomain}"
                 )
                 description = (
-                    f"O subdominio '{subdomain}' esta acessivel publicamente. "
-                    f"Ambientes de dev/staging frequentemente tem seguranca reduzida, "
-                    f"debug ativado, e podem expor dados reais."
+                    f"The subdomain '{subdomain}' is publicly accessible. "
+                    f"Dev/staging environments often have reduced security, "
+                    f"debug enabled, and may expose real data."
                     if is_risky
-                    else f"O subdominio '{subdomain}' esta ativo e respondendo."
+                    else f"The subdomain '{subdomain}' is active and responding."
                 )
 
                 self.add_finding(
@@ -191,12 +191,12 @@ class SubdomainScanner(BaseScanner):
                         "response_snippet": f"Status: {response.status_code}, Server: {response.headers.get('Server', 'unknown')}",
                     },
                     remediation=(
-                        "1. Proteja ambientes de dev/staging com autenticacao (HTTP Basic Auth ou VPN).\n"
-                        "2. Nao use dados reais em ambientes de teste.\n"
-                        "3. Mantenha debug desativado mesmo em staging.\n"
-                        "4. Use DNS privado ou VPN para acessar ambientes internos."
+                        "1. Protect dev/staging environments with authentication (HTTP Basic Auth or VPN).\n"
+                        "2. Do not use real data in test environments.\n"
+                        "3. Keep debug disabled even in staging.\n"
+                        "4. Use private DNS or VPN to access internal environments."
                         if is_risky
-                        else "Verifique se este subdominio precisa estar publico e se esta adequadamente protegido."
+                        else "Verify whether this subdomain needs to be public and whether it is adequately protected."
                     ),
                     owasp_category="A05:2021 - Security Misconfiguration",
                     cvss_score=7.0 if is_risky else 2.0,

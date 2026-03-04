@@ -1,5 +1,5 @@
 """
-HackerPA Engine - Endpoint Discovery & Access Control Scanner
+VibeCrack Engine - Endpoint Discovery & Access Control Scanner
 
 Discovers API endpoints by:
   - Parsing HTML and JavaScript for API URLs (fetch/axios calls, hrefs)

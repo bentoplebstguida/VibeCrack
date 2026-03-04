@@ -1,5 +1,5 @@
 """
-HackerPA Engine - Web Crawler / Spider
+VibeCrack Engine - Web Crawler / Spider
 
 Central crawler that runs BEFORE all other scanners to discover the full
 attack surface of a target website.  It recursively follows same-domain
@@ -24,8 +24,7 @@ from urllib.parse import urljoin, urlparse, parse_qs, urldefrag
 
 from bs4 import BeautifulSoup
 
-from engine.orchestrator import firebase_client
-from engine.scanners.base_scanner import BaseScanner
+from engine.scanners.base_scanner import BaseScanner, _get_firebase
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +120,7 @@ class CrawlerScanner(BaseScanner):
             if self._data_store:
                 self._data_store.save_crawl_data(self.scan_id, crawl_data)
             else:
-                firebase_client.update_scan_status(
+                _get_firebase().update_scan_status(
                     self.scan_id,
                     "running",
                     extra_fields={"crawlData": crawl_data},
@@ -141,13 +140,13 @@ class CrawlerScanner(BaseScanner):
         # Add an informational finding summarising what was discovered
         self.add_finding(
             severity="info",
-            title="Superficie de ataque mapeada pelo crawler",
+            title="Attack surface mapped by crawler",
             description=(
-                f"O crawler descobriu {len(self._pages)} pagina(s), "
-                f"{len(self._forms)} formulario(s), "
-                f"{len(self._params)} conjunto(s) de parametros URL, "
-                f"{len(self._js_files)} arquivo(s) JavaScript e "
-                f"{len(self._api_endpoints)} endpoint(s) de API."
+                f"The crawler discovered {len(self._pages)} page(s), "
+                f"{len(self._forms)} form(s), "
+                f"{len(self._params)} URL parameter set(s), "
+                f"{len(self._js_files)} JavaScript file(s), and "
+                f"{len(self._api_endpoints)} API endpoint(s)."
             ),
             evidence={
                 "url": self.base_url,
@@ -158,8 +157,8 @@ class CrawlerScanner(BaseScanner):
                 ),
             },
             remediation=(
-                "Revise todos os endpoints e formularios descobertos. "
-                "Remova paginas e APIs que nao devem ser publicas."
+                "Review all discovered endpoints and forms. "
+                "Remove pages and APIs that should not be public."
             ),
             owasp_category="A01:2021 - Broken Access Control",
             affected_url=self.base_url,

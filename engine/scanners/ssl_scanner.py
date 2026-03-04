@@ -1,5 +1,5 @@
 """
-HackerPA Engine - SSL/TLS Scanner
+VibeCrack Engine - SSL/TLS Scanner
 
 Checks SSL certificate validity, expiration, protocol versions,
 and common TLS misconfigurations.
@@ -50,11 +50,11 @@ class SSLScanner(BaseScanner):
             else:
                 self.add_finding(
                     severity="high",
-                    title="HTTP nao redireciona para HTTPS",
-                    description="O site aceita conexoes HTTP sem redirecionar para HTTPS. Dados podem ser interceptados em transito.",
+                    title="HTTP does not redirect to HTTPS",
+                    description="The site accepts HTTP connections without redirecting to HTTPS. Data can be intercepted in transit.",
                     evidence={"url": http_url, "response_snippet": f"Status: {response.status_code}, Location: {location}"},
                     remediation=self.get_remediation_with_code("ssl",
-                    "Configure um redirect 301 de HTTP para HTTPS no seu web server ou load balancer."),
+                    "Configure a 301 redirect from HTTP to HTTPS on your web server or load balancer."),
                     owasp_category="A02:2021 - Cryptographic Failures",
                     cvss_score=7.5,
                     affected_url=http_url,
@@ -62,11 +62,11 @@ class SSLScanner(BaseScanner):
         elif response.status_code == 200:
             self.add_finding(
                 severity="high",
-                title="Site acessivel via HTTP sem redirect",
-                description="O site responde via HTTP (porta 80) sem redirecionar para HTTPS. Dados trafegam sem encriptacao.",
-                evidence={"url": http_url, "response_snippet": f"Status: {response.status_code} (sem redirect)"},
+                title="Site accessible via HTTP without redirect",
+                description="The site responds via HTTP (port 80) without redirecting to HTTPS. Data travels without encryption.",
+                evidence={"url": http_url, "response_snippet": f"Status: {response.status_code} (no redirect)"},
                 remediation=self.get_remediation_with_code("ssl",
-                    "Configure um redirect 301 de HTTP para HTTPS. Todo trafego deve ser encriptado."),
+                    "Configure a 301 redirect from HTTP to HTTPS. All traffic should be encrypted."),
                 owasp_category="A02:2021 - Cryptographic Failures",
                 cvss_score=7.5,
                 affected_url=http_url,
@@ -83,10 +83,10 @@ class SSLScanner(BaseScanner):
                     if not cert:
                         self.add_finding(
                             severity="critical",
-                            title="Certificado SSL nao encontrado",
-                            description="O servidor nao apresentou um certificado SSL valido.",
+                            title="SSL certificate not found",
+                            description="The server did not present a valid SSL certificate.",
                             remediation=self.get_remediation_with_code("ssl",
-                            "Instale um certificado SSL valido. Use Let's Encrypt para certificados gratuitos."),
+                            "Install a valid SSL certificate. Use Let's Encrypt for free certificates."),
                             owasp_category="A02:2021 - Cryptographic Failures",
                             cvss_score=9.0,
                             affected_url=self.base_url,
@@ -104,11 +104,11 @@ class SSLScanner(BaseScanner):
                         if days_left < 0:
                             self.add_finding(
                                 severity="critical",
-                                title="Certificado SSL expirado",
-                                description=f"O certificado expirou ha {abs(days_left)} dias ({not_after}). Navegadores mostram erro de seguranca.",
+                                title="SSL certificate expired",
+                                description=f"The certificate expired {abs(days_left)} days ago ({not_after}). Browsers show security error.",
                                 evidence={"url": self.base_url, "response_snippet": f"Expiry: {not_after}, Days: {days_left}"},
                                 remediation=self.get_remediation_with_code("ssl",
-                                    "Renove o certificado SSL imediatamente. Use Let's Encrypt com auto-renovacao."),
+                                    "Renew the SSL certificate immediately. Use Let's Encrypt with auto-renewal."),
                                 owasp_category="A02:2021 - Cryptographic Failures",
                                 cvss_score=9.0,
                                 affected_url=self.base_url,
@@ -116,11 +116,11 @@ class SSLScanner(BaseScanner):
                         elif days_left < 30:
                             self.add_finding(
                                 severity="medium",
-                                title=f"Certificado SSL expira em {days_left} dias",
-                                description=f"O certificado expira em {not_after}. Renove antes que expire para evitar interrupcoes.",
+                                title=f"SSL certificate expires in {days_left} days",
+                                description=f"The certificate expires on {not_after}. Renew before it expires to avoid disruptions.",
                                 evidence={"url": self.base_url, "response_snippet": f"Expiry: {not_after}, Days left: {days_left}"},
                                 remediation=self.get_remediation_with_code("ssl",
-                                    "Renove o certificado SSL. Configure auto-renovacao com Let's Encrypt ou seu provedor de SSL."),
+                                    "Renew the SSL certificate. Configure auto-renewal with Let's Encrypt or your SSL provider."),
                                 owasp_category="A02:2021 - Cryptographic Failures",
                                 cvss_score=4.0,
                                 affected_url=self.base_url,
@@ -142,11 +142,11 @@ class SSLScanner(BaseScanner):
         except ssl.SSLCertVerificationError as e:
             self.add_finding(
                 severity="critical",
-                title="Certificado SSL invalido",
-                description=f"O certificado nao passou na verificacao: {e}. Navegadores vao bloquear o acesso.",
+                title="Invalid SSL certificate",
+                description=f"The certificate failed verification: {e}. Browsers will block access.",
                 evidence={"url": self.base_url, "response_snippet": str(e)},
                 remediation=self.get_remediation_with_code("ssl",
-                    "Corrija o certificado SSL. Causas comuns: certificado auto-assinado, CN incorreto, cadeia incompleta."),
+                    "Fix the SSL certificate. Common causes: self-signed certificate, incorrect CN, incomplete chain."),
                 owasp_category="A02:2021 - Cryptographic Failures",
                 cvss_score=9.0,
                 affected_url=self.base_url,
@@ -173,11 +173,11 @@ class SSLScanner(BaseScanner):
                     with context.wrap_socket(sock, server_hostname=hostname):
                         self.add_finding(
                             severity=severity,
-                            title=f"Protocolo inseguro suportado: {proto_name}",
-                            description=f"O servidor aceita conexoes {proto_name}, que tem vulnerabilidades conhecidas (POODLE, BEAST).",
+                            title=f"Insecure protocol supported: {proto_name}",
+                            description=f"The server accepts {proto_name} connections, which have known vulnerabilities (POODLE, BEAST).",
                             evidence={"url": self.base_url, "response_snippet": f"{proto_name} connection successful"},
                             remediation=self.get_remediation_with_code("ssl",
-                                f"Desabilite {proto_name} no servidor. Use apenas TLS 1.2 e TLS 1.3."),
+                                f"Disable {proto_name} on the server. Use only TLS 1.2 and TLS 1.3."),
                             owasp_category="A02:2021 - Cryptographic Failures",
                             cvss_score=7.0 if severity == "critical" else 5.0,
                             affected_url=self.base_url,

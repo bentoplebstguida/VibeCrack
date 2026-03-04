@@ -1,5 +1,5 @@
 """
-HackerPA Engine - Cross-Site Scripting (XSS) Scanner
+VibeCrack Engine - Cross-Site Scripting (XSS) Scanner
 
 Tests for reflected XSS vulnerabilities by injecting payloads from
 config.XSS_PAYLOADS into form inputs and URL parameters, then checking

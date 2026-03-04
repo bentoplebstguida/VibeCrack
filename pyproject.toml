@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "vibecrack"
@@ -9,6 +9,9 @@ description = "Open source security scanner for web applications"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
+authors = [
+    { name = "VibeCrack Contributors" },
+]
 keywords = ["security", "scanner", "pentest", "vulnerability", "web"]
 classifiers = [
     "Development Status :: 4 - Beta",

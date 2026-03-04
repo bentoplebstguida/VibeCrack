@@ -1,9 +1,9 @@
 """
-HackerPA Engine - OWASP ZAP Integration Scanner
+VibeCrack Engine - OWASP ZAP Integration Scanner
 
 Integrates with OWASP ZAP (Zed Attack Proxy) running as a daemon in Docker.
 Uses ZAP's API to perform automated active/passive scanning and imports
-the findings into HackerPA's vulnerability database.
+the findings into VibeCrack's vulnerability database.
 
 Requires ZAP running with API enabled (see docker-compose.yml).
 """
@@ -27,7 +27,7 @@ ZAP_API_KEY = os.environ.get("ZAP_API_KEY", "")  # disabled by default in docker
 ZAP_SCAN_TIMEOUT = int(os.environ.get("ZAP_SCAN_TIMEOUT", "600"))  # 10 minutes
 ZAP_POLL_INTERVAL = 5  # seconds between progress checks
 
-# ZAP risk levels -> HackerPA severity mapping
+# ZAP risk levels -> VibeCrack severity mapping
 ZAP_RISK_MAP = {
     "0": "info",       # Informational
     "1": "low",        # Low
@@ -87,10 +87,10 @@ class ZAPScanner(BaseScanner):
             self.log("warning", "OWASP ZAP is not available - skipping ZAP scan")
             self.add_finding(
                 severity="info",
-                title="OWASP ZAP scan nao disponivel",
-                description="O container do OWASP ZAP nao esta acessivel. "
-                            "O scan ZAP foi ignorado. Execute via Docker Compose para habilitar.",
-                remediation="Inicie o ZAP com: docker-compose up -d zap",
+                title="OWASP ZAP scan not available",
+                description="The OWASP ZAP container is not accessible. "
+                            "ZAP scan was skipped. Run via Docker Compose to enable.",
+                remediation="Start ZAP with: docker-compose up -d zap",
                 affected_url=self.base_url,
             )
             return
@@ -223,7 +223,7 @@ class ZAPScanner(BaseScanner):
         return result.get("alerts", [])
 
     def _import_alerts(self, alerts: list[dict[str, Any]]) -> None:
-        """Convert ZAP alerts into HackerPA findings."""
+        """Convert ZAP alerts into VibeCrack findings."""
         seen_titles: set[str] = set()
 
         for alert in alerts:
@@ -261,11 +261,11 @@ class ZAPScanner(BaseScanner):
                 title=f"[ZAP] {title}",
                 description=(
                     f"{description}\n\n"
-                    f"Confianca: {confidence_label} | "
+                    f"Confidence: {confidence_label} | "
                     f"CWE: {cwe_id or 'N/A'} | WASC: {wasc_id or 'N/A'}"
                 ),
                 evidence=evidence[:500] if evidence else "",
-                remediation=solution or "Consulte a documentacao do OWASP ZAP para detalhes.",
+                remediation=solution or "Refer to the OWASP ZAP documentation for details.",
                 owasp_category=owasp,
                 cvss_score=self._risk_to_cvss(risk),
                 affected_url=url,

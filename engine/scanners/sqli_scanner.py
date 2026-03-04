@@ -1,5 +1,5 @@
 """
-HackerPA Engine - SQL Injection Scanner
+VibeCrack Engine - SQL Injection Scanner
 
 Tests for SQL injection vulnerabilities using three detection techniques:
   1. Error-based: Inject payloads and look for SQL error messages.

@@ -1,5 +1,5 @@
 """
-HackerPA Engine - Cross-Site Request Forgery (CSRF) Scanner
+VibeCrack Engine - Cross-Site Request Forgery (CSRF) Scanner
 
 Fetches pages and inspects every <form> for CSRF protection mechanisms:
   - Hidden inputs with CSRF token names (csrf_token, _token, etc.)

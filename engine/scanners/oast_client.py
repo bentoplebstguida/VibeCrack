@@ -1,5 +1,5 @@
 """
-HackerPA Engine - Out-of-Band Application Security Testing (OAST) Client
+VibeCrack Engine - Out-of-Band Application Security Testing (OAST) Client
 
 Provides unique callback URLs and payloads for detecting blind
 vulnerabilities (SSRF, XXE, RCE, etc.) where the application makes an
@@ -304,7 +304,7 @@ class OASTClient:
         if tag in self._tokens:
             return self._tokens[tag]
 
-        raw = f"hackerpa-{self.scan_id}-{tag}-{uuid.uuid4().hex[:8]}"
+        raw = f"vibecrack-{self.scan_id}-{tag}-{uuid.uuid4().hex[:8]}"
         # Create a short, URL-safe hash
         token = hashlib.sha256(raw.encode()).hexdigest()[:16]
         self._tokens[tag] = token
@@ -332,7 +332,7 @@ class OASTClient:
         """Return a DNS canary hostname for the given *tag*, or None if
         no DNS base domain is configured.
 
-        Example: ``abc123def456.oast.hackerpa.example.com``
+        Example: ``abc123def456.oast.vibecrack.example.com``
         """
         token = self._generate_token(tag)
 

@@ -1,5 +1,5 @@
 """
-HackerPA Engine - Security Headers Scanner
+VibeCrack Engine - Security Headers Scanner
 
 Checks for the presence and correct configuration of HTTP security headers
 (HSTS, CSP, X-Frame-Options, etc.).
@@ -20,9 +20,9 @@ class HeadersScanner(BaseScanner):
             self.log("error", f"Could not reach {self.base_url}")
             self.add_finding(
                 severity="high",
-                title="Site inacessivel",
-                description=f"Nao foi possivel acessar {self.base_url}. Verifique se o dominio esta correto e acessivel.",
-                remediation="Verifique se o dominio esta correto, o DNS esta configurado, e o servidor esta respondendo.",
+                title="Site unreachable",
+                description=f"Could not access {self.base_url}. Verify the domain is correct and accessible.",
+                remediation="Verify the domain is correct, DNS is configured, and the server is responding.",
                 owasp_category="A05:2021 - Security Misconfiguration",
                 affected_url=self.base_url,
             )
@@ -42,11 +42,11 @@ class HeadersScanner(BaseScanner):
                     missing_required.append(header_name)
                     self.add_finding(
                         severity=header_config["severity"],
-                        title=f"Header de seguranca ausente: {header_name}",
-                        description=f"{header_config['description']}. Este header nao foi encontrado na resposta do servidor.",
-                        evidence={"url": self.base_url, "response_snippet": f"Header '{header_name}' nao presente na resposta"},
+                        title=f"Missing security header: {header_name}",
+                        description=f"{header_config['description']}. This header was not found in the server response.",
+                        evidence={"url": self.base_url, "response_snippet": f"Header '{header_name}' not present in response"},
                         remediation=self.get_remediation_with_code("headers",
-                            f"Adicione o header '{header_name}' nas respostas do servidor. Consulte: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/{header_name}"),
+                            f"Add the '{header_name}' header to server responses. See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/{header_name}"),
                         owasp_category="A05:2021 - Security Misconfiguration",
                         cvss_score=6.5 if header_config["severity"] == "high" else 4.0,
                         affected_url=self.base_url,
@@ -55,10 +55,10 @@ class HeadersScanner(BaseScanner):
                     missing_optional.append(header_name)
                     self.add_finding(
                         severity="info",
-                        title=f"Header opcional ausente: {header_name}",
-                        description=f"{header_config['description']}. Recomendado mas nao obrigatorio.",
+                        title=f"Optional header missing: {header_name}",
+                        description=f"{header_config['description']}. Recommended but not required.",
                         remediation=self.get_remediation_with_code("headers",
-                            f"Considere adicionar o header '{header_name}' para maior seguranca."),
+                            f"Consider adding the '{header_name}' header for better security."),
                         owasp_category="A05:2021 - Security Misconfiguration",
                         affected_url=self.base_url,
                     )
@@ -68,8 +68,8 @@ class HeadersScanner(BaseScanner):
                 if expected and value.lower() != expected.lower():
                     self.add_finding(
                         severity="low",
-                        title=f"Header com valor inesperado: {header_name}",
-                        description=f"Esperado '{expected}', encontrado '{value}'.",
+                        title=f"Header with unexpected value: {header_name}",
+                        description=f"Expected '{expected}', found '{value}'.",
                         evidence={"url": self.base_url, "payload": f"{header_name}: {value}", "response_snippet": f"Expected: {expected}"},
                         remediation=self.get_remediation_with_code("headers",
                             f"Configure o header '{header_name}' com o valor '{expected}'."),
@@ -85,11 +85,11 @@ class HeadersScanner(BaseScanner):
         if server_header:
             self.add_finding(
                 severity="low",
-                title="Header 'Server' expoe informacoes do servidor",
-                description=f"O header 'Server' revela: '{server_header}'. Isso ajuda atacantes a identificar o software usado.",
+                title="'Server' header exposes server information",
+                description=f"The 'Server' header reveals: '{server_header}'. This helps attackers identify the software in use.",
                 evidence={"url": self.base_url, "response_snippet": f"Server: {server_header}"},
                 remediation=self.get_remediation_with_code("headers",
-                    "Remova ou ofusque o header 'Server' na configuracao do seu web server."),
+                    "Remove or obfuscate the 'Server' header in your web server configuration."),
                 owasp_category="A05:2021 - Security Misconfiguration",
                 cvss_score=2.0,
                 affected_url=self.base_url,
@@ -99,11 +99,11 @@ class HeadersScanner(BaseScanner):
         if x_powered:
             self.add_finding(
                 severity="low",
-                title="Header 'X-Powered-By' expoe tecnologia",
-                description=f"O header 'X-Powered-By' revela: '{x_powered}'. Isso ajuda atacantes a identificar frameworks e versoes.",
+                title="'X-Powered-By' header exposes technology",
+                description=f"The 'X-Powered-By' header reveals: '{x_powered}'. This helps attackers identify frameworks and versions.",
                 evidence={"url": self.base_url, "response_snippet": f"X-Powered-By: {x_powered}"},
                 remediation=self.get_remediation_with_code("headers",
-                    "Remova o header 'X-Powered-By'. No Express.js use app.disable('x-powered-by')."),
+                    "Remove the 'X-Powered-By' header. In Express.js use app.disable('x-powered-by')."),
                 owasp_category="A05:2021 - Security Misconfiguration",
                 cvss_score=2.0,
                 affected_url=self.base_url,

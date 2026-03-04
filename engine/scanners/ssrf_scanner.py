@@ -1,5 +1,5 @@
 """
-HackerPA Engine - SSRF & RCE Validation Scanner
+VibeCrack Engine - SSRF & RCE Validation Scanner
 
 Tests for Server-Side Request Forgery (SSRF) by attempting to make the
 target server fetch internal resources or callback URLs. Also checks for
@@ -227,11 +227,11 @@ class SSRFScanner(BaseScanner):
                 if re.search(pattern, body, re.IGNORECASE):
                     self.add_finding(
                         severity="critical",
-                        title=f"SSRF confirmado com possivel RCE via parametro '{param}'",
+                        title=f"Confirmed SSRF with possible RCE via parameter '{param}'",
                         description=(
-                            f"O servidor processou uma URL interna/maliciosa fornecida no parametro '{param}'. "
-                            f"O conteudo da resposta indica que o servidor executou a requisicao, "
-                            f"podendo expor arquivos internos, metadados de cloud, ou permitir execucao de comandos."
+                            f"The server processed an internal/malicious URL provided in the parameter '{param}'. "
+                            f"The response content indicates the server executed the request, "
+                            f"potentially exposing internal files, cloud metadata, or allowing command execution."
                         ),
                         evidence={
                             "url": url,
@@ -239,11 +239,11 @@ class SSRFScanner(BaseScanner):
                             "response_snippet": body[:300],
                         },
                         remediation=(
-                            "1. NUNCA use input do usuario diretamente em requisicoes server-side.\n"
-                            "2. Implemente uma allowlist de dominios/IPs permitidos.\n"
-                            "3. Bloqueie requisicoes para IPs privados (127.0.0.1, 10.x, 172.16.x, 192.168.x).\n"
-                            "4. Bloqueie requisicoes para metadados de cloud (169.254.169.254).\n"
-                            "5. Use uma biblioteca de validacao de URL que rejeite esquemas perigosos (file://, gopher://)."
+                            "1. NEVER use user input directly in server-side requests.\n"
+                            "2. Implement an allowlist of permitted domains/IPs.\n"
+                            "3. Block requests to private IPs (127.0.0.1, 10.x, 172.16.x, 192.168.x).\n"
+                            "4. Block requests to cloud metadata (169.254.169.254).\n"
+                            "5. Use a URL validation library that rejects dangerous schemes (file://, gopher://)."
                         ),
                         owasp_category="A10:2021 - Server-Side Request Forgery",
                         cvss_score=9.8,
@@ -256,11 +256,11 @@ class SSRFScanner(BaseScanner):
                 if re.search(pattern, body, re.IGNORECASE):
                     self.add_finding(
                         severity="high",
-                        title=f"Possivel SSRF via parametro '{param}'",
+                        title=f"Possible SSRF via parameter '{param}'",
                         description=(
-                            f"O servidor parece ter tentado fazer uma requisicao para a URL fornecida no parametro '{param}'. "
-                            f"A mensagem de erro indica que o servidor processou a URL internamente. "
-                            f"Com payloads mais elaborados, isso pode levar a acesso a recursos internos."
+                            f"The server appears to have attempted a request to the URL provided in the parameter '{param}'. "
+                            f"The error message indicates the server processed the URL internally. "
+                            f"With more elaborate payloads, this could lead to access to internal resources."
                         ),
                         evidence={
                             "url": url,
@@ -268,9 +268,9 @@ class SSRFScanner(BaseScanner):
                             "response_snippet": body[:300],
                         },
                         remediation=(
-                            "1. Valide e sanitize todas as URLs fornecidas pelo usuario.\n"
-                            "2. Use allowlists de dominios permitidos.\n"
-                            "3. Nao exponha mensagens de erro internas ao usuario."
+                            "1. Validate and sanitize all user-provided URLs.\n"
+                            "2. Use allowlists of permitted domains.\n"
+                            "3. Do not expose internal error messages to the user."
                         ),
                         owasp_category="A10:2021 - Server-Side Request Forgery",
                         cvss_score=7.5,
@@ -314,10 +314,10 @@ class SSRFScanner(BaseScanner):
                 if re.search(pattern, body, re.IGNORECASE):
                     self.add_finding(
                         severity="high",
-                        title=f"Endpoint de proxy/fetch vulneravel a SSRF: {path.split('?')[0]}",
+                        title=f"Proxy/fetch endpoint vulnerable to SSRF: {path.split('?')[0]}",
                         description=(
-                            f"O endpoint '{path.split('?')[0]}' aceita URLs e tenta busca-las server-side. "
-                            f"Isso pode ser explorado para acessar recursos internos da rede."
+                            f"The endpoint '{path.split('?')[0]}' accepts URLs and attempts to fetch them server-side. "
+                            f"This can be exploited to access internal network resources."
                         ),
                         evidence={
                             "url": url,
@@ -325,9 +325,9 @@ class SSRFScanner(BaseScanner):
                             "response_snippet": body[:300],
                         },
                         remediation=(
-                            "1. Remova endpoints de proxy desnecessarios.\n"
-                            "2. Se necessario, implemente allowlist rigorosa de dominios.\n"
-                            "3. Bloqueie IPs privados e de metadados de cloud."
+                            "1. Remove unnecessary proxy endpoints.\n"
+                            "2. If needed, implement a strict domain allowlist.\n"
+                            "3. Block private IPs and cloud metadata IPs."
                         ),
                         owasp_category="A10:2021 - Server-Side Request Forgery",
                         cvss_score=8.0,
@@ -361,11 +361,11 @@ class SSRFScanner(BaseScanner):
                 if re.search(pattern, body, re.IGNORECASE):
                     self.add_finding(
                         severity="critical",
-                        title="Possivel Remote Code Execution (RCE) detectado",
+                        title="Possible Remote Code Execution (RCE) detected",
                         description=(
-                            f"O endpoint '{path}' retornou conteudo que indica execucao de comandos "
-                            f"ou acesso a arquivos do sistema. Isso e uma vulnerabilidade critica que "
-                            f"permite controle total do servidor."
+                            f"The endpoint '{path}' returned content indicating command execution "
+                            f"or system file access. This is a critical vulnerability that "
+                            f"allows full control of the server."
                         ),
                         evidence={
                             "url": url,
@@ -373,11 +373,11 @@ class SSRFScanner(BaseScanner):
                             "response_snippet": body[:300],
                         },
                         remediation=(
-                            "1. URGENTE: Desabilite qualquer endpoint que execute comandos do sistema.\n"
-                            "2. Nunca passe input do usuario para funcoes como exec(), system(), eval().\n"
-                            "3. Remova CGI scripts desnecessarios.\n"
-                            "4. Desabilite debug endpoints em producao.\n"
-                            "5. Atualize o framework para a versao mais recente."
+                            "1. URGENT: Disable any endpoint that executes system commands.\n"
+                            "2. Never pass user input to functions like exec(), system(), eval().\n"
+                            "3. Remove unnecessary CGI scripts.\n"
+                            "4. Disable debug endpoints in production.\n"
+                            "5. Update the framework to the latest version."
                         ),
                         owasp_category="A03:2021 - Injection",
                         cvss_score=10.0,
@@ -438,12 +438,12 @@ class SSRFScanner(BaseScanner):
 
                     self.add_finding(
                         severity=severity,
-                        title=f"SSRF confirmado via bypass ({payload_desc}) no parametro '{param}'",
+                        title=f"Confirmed SSRF via bypass ({payload_desc}) on parameter '{param}'",
                         description=(
-                            f"O servidor processou uma URL usando a tecnica de bypass '{payload_desc}' "
-                            f"fornecida no parametro '{param}'. A resposta contem evidencia de acesso a "
-                            f"recursos internos (categoria: {analysis['category']}). "
-                            f"Padroes encontrados: {', '.join(analysis['patterns'][:3])}."
+                            f"The server processed a URL using the bypass technique '{payload_desc}' "
+                            f"provided in the parameter '{param}'. The response contains evidence of access to "
+                            f"internal resources (category: {analysis['category']}). "
+                            f"Patterns found: {', '.join(analysis['patterns'][:3])}."
                         ),
                         evidence={
                             "url": url,
@@ -454,14 +454,14 @@ class SSRFScanner(BaseScanner):
                             "response_snippet": analysis["snippet"][:300],
                         },
                         remediation=(
-                            "1. NUNCA use input do usuario diretamente em requisicoes server-side.\n"
-                            "2. Implemente validacao rigorosa de URL: resolva o hostname para IP "
-                            "e verifique se e um IP privado ANTES de fazer a requisicao.\n"
-                            "3. Bloqueie esquemas perigosos: file://, gopher://, dict://, ftp://.\n"
-                            "4. Use allowlists de dominios/IPs ao inves de blocklists.\n"
-                            "5. Desabilite redirecionamentos em requisicoes server-side.\n"
-                            "6. Bloqueie metadados de cloud (169.254.169.254) no firewall/rede.\n"
-                            "7. Migre para IMDSv2 (AWS) que requer token de sessao."
+                            "1. NEVER use user input directly in server-side requests.\n"
+                            "2. Implement strict URL validation: resolve the hostname to IP "
+                            "and verify it is not a private IP BEFORE making the request.\n"
+                            "3. Block dangerous schemes: file://, gopher://, dict://, ftp://.\n"
+                            "4. Use domain/IP allowlists instead of blocklists.\n"
+                            "5. Disable redirects in server-side requests.\n"
+                            "6. Block cloud metadata (169.254.169.254) at the firewall/network level.\n"
+                            "7. Migrate to IMDSv2 (AWS) which requires a session token."
                         ),
                         owasp_category="A10:2021 - Server-Side Request Forgery",
                         cvss_score=9.8 if severity == "critical" else 8.0,
@@ -474,11 +474,11 @@ class SSRFScanner(BaseScanner):
                     if re.search(pattern, body, re.IGNORECASE):
                         self.add_finding(
                             severity="high",
-                            title=f"SSRF detectado via bypass ({payload_desc}) no parametro '{param}'",
+                            title=f"SSRF detected via bypass ({payload_desc}) on parameter '{param}'",
                             description=(
-                                f"O servidor tentou processar a URL usando a tecnica '{payload_desc}' "
-                                f"no parametro '{param}'. A resposta contem indicadores de que o servidor "
-                                f"fez uma requisicao interna."
+                                f"The server attempted to process the URL using the technique '{payload_desc}' "
+                                f"on parameter '{param}'. The response contains indicators that the server "
+                                f"made an internal request."
                             ),
                             evidence={
                                 "url": url,
@@ -487,10 +487,10 @@ class SSRFScanner(BaseScanner):
                                 "response_snippet": body[:300],
                             },
                             remediation=(
-                                "1. Valide e sanitize todas as URLs fornecidas pelo usuario.\n"
-                                "2. Resolva hostnames para IP e bloqueie ranges privados.\n"
-                                "3. Bloqueie esquemas perigosos (file://, gopher://, dict://).\n"
-                                "4. Nao exponha mensagens de erro internas ao usuario."
+                                "1. Validate and sanitize all user-provided URLs.\n"
+                                "2. Resolve hostnames to IP and block private ranges.\n"
+                                "3. Block dangerous schemes (file://, gopher://, dict://).\n"
+                                "4. Do not expose internal error messages to the user."
                             ),
                             owasp_category="A10:2021 - Server-Side Request Forgery",
                             cvss_score=7.5,
@@ -503,12 +503,12 @@ class SSRFScanner(BaseScanner):
                 if timing["suspicious"]:
                     self.add_finding(
                         severity="medium",
-                        title=f"Possivel blind SSRF via timing no parametro '{param}'",
+                        title=f"Possible blind SSRF via timing on parameter '{param}'",
                         description=(
-                            f"O tempo de resposta para o parametro '{param}' com payload "
-                            f"'{payload_desc}' foi {timing['factor']}x mais lento que o baseline "
+                            f"The response time for parameter '{param}' with payload "
+                            f"'{payload_desc}' was {timing['factor']}x slower than the baseline "
                             f"({timing['baseline_ms']}ms vs {timing['test_ms']}ms). "
-                            f"Isso pode indicar que o servidor esta tentando buscar a URL internamente."
+                            f"This may indicate the server is trying to fetch the URL internally."
                         ),
                         evidence={
                             "url": url,
@@ -519,10 +519,10 @@ class SSRFScanner(BaseScanner):
                             "slowdown_factor": timing["factor"],
                         },
                         remediation=(
-                            "1. Investigue se o servidor faz requisicoes externas com base em input do usuario.\n"
-                            "2. Implemente timeouts curtos para requisicoes server-side (max 3 segundos).\n"
-                            "3. Use allowlists de dominios e bloqueie IPs privados.\n"
-                            "4. Considere usar um proxy de saida (egress proxy) com regras de firewall."
+                            "1. Investigate whether the server makes external requests based on user input.\n"
+                            "2. Implement short timeouts for server-side requests (max 3 seconds).\n"
+                            "3. Use domain allowlists and block private IPs.\n"
+                            "4. Consider using an egress proxy with firewall rules."
                         ),
                         owasp_category="A10:2021 - Server-Side Request Forgery",
                         cvss_score=5.0,
@@ -553,13 +553,13 @@ class SSRFScanner(BaseScanner):
 
             self.add_finding(
                 severity="critical",
-                title=f"Blind SSRF confirmado via OAST callback (tag: {tag})",
+                title=f"Confirmed blind SSRF via OAST callback (tag: {tag})",
                 description=(
-                    f"O servidor alvo fez uma requisicao outbound para o endpoint OAST, "
-                    f"confirmando uma vulnerabilidade de blind SSRF. O callback foi recebido "
-                    f"com o token '{token}' (tag: {tag}) originado do IP {source_ip}. "
-                    f"Isso significa que um atacante pode fazer o servidor buscar URLs arbitrarias, "
-                    f"potencialmente acessando recursos internos da rede."
+                    f"The target server made an outbound request to the OAST endpoint, "
+                    f"confirming a blind SSRF vulnerability. The callback was received "
+                    f"with token '{token}' (tag: {tag}) originating from IP {source_ip}. "
+                    f"This means an attacker can make the server fetch arbitrary URLs, "
+                    f"potentially accessing internal network resources."
                 ),
                 evidence={
                     "oast_tag": tag,
@@ -569,12 +569,12 @@ class SSRFScanner(BaseScanner):
                     "confirmation": "Out-of-band callback received at OAST endpoint",
                 },
                 remediation=(
-                    "1. CRITICO: O servidor esta fazendo requisicoes externas com base em input do usuario.\n"
-                    "2. Implemente validacao rigorosa de URL no server-side.\n"
-                    "3. Bloqueie todas as requisicoes outbound desnecessarias no firewall.\n"
-                    "4. Use allowlists de dominios e bloqueie ranges de IP privados.\n"
-                    "5. Desabilite esquemas perigosos (file://, gopher://, dict://).\n"
-                    "6. Migre para IMDSv2 (AWS) e configure firewall para bloquear 169.254.169.254."
+                    "1. CRITICAL: The server is making external requests based on user input.\n"
+                    "2. Implement strict URL validation on the server-side.\n"
+                    "3. Block all unnecessary outbound requests at the firewall.\n"
+                    "4. Use domain allowlists and block private IP ranges.\n"
+                    "5. Disable dangerous schemes (file://, gopher://, dict://).\n"
+                    "6. Migrate to IMDSv2 (AWS) and configure firewall to block 169.254.169.254."
                 ),
                 owasp_category="A10:2021 - Server-Side Request Forgery",
                 cvss_score=9.8,
