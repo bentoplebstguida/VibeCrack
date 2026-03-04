@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vibecrack"
+version = "0.1.0"
+description = "Open source security scanner for web applications"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "VibeCrack Contributors" },
+]
+keywords = ["security", "scanner", "pentest", "vulnerability", "web"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+dependencies = [
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.1.0",
+    "rich>=13.0.0",
+    "urllib3>=2.0.0",
+]
+
+[project.optional-dependencies]
+full = [
+    "sslyze>=6.0.0",
+    "reportlab>=4.1.0",
+    "anthropic>=0.78.0",
+    "playwright>=1.40.0",
+]
+
+[project.scripts]
+vibecrack = "engine.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/bentoplebstguida/VibeCrack"
+Cloud = "https://vibecrack.com"
+Issues = "https://github.com/bentoplebstguida/VibeCrack/issues"
+
+[tool.setuptools.packages.find]
+include = ["engine*"]

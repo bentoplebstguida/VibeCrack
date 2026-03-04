@@ -1,0 +1,88 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Next.js
+.next/
+out/
+
+# Environment variables (NEVER commit these)
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Firebase credentials (NEVER commit)
+serviceAccountKey.json
+**/serviceAccountKey.json
+firebase-adminsdk*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docker
+docker-compose.override.yml
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Google Cloud credentials
+.gcloud/
+
+# Firebase cache
+.firebase/
+
+# Private keys and certificates
+*.pem
+*.key
+
+# Analysis artifacts (contain third-party secrets)
+ifood_app.js
+analysis_output.txt
+analyze_secrets*.py
+
+# Local build/deploy configs
+cloudbuild.local.yaml
+start_production_engine.ps1
+
+# Windows artifacts
+nul
+
+# ============================================================
+# SaaS / Private (frontend, Firebase, deploy)
+# These live in the private VibeCrackSaaS repo
+# ============================================================
+frontend/
+firebase/
+firebase.json
+.firebaserc
+deploy_cloudrun.sh
+engine/docker/
+engine/orchestrator/main.py
+engine/orchestrator/cloudrun_handler.py
+engine/orchestrator/run_saved_scan.py
+engine/orchestrator/firebase_client.py
+engine/requirements.txt
+
+# CLI output artifacts
+vibecrack_*.json
+vibecrack_*.pdf
+vibecrack_*.html
