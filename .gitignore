@@ -40,3 +40,28 @@ npm-debug.log*
 
 # Docker
 docker-compose.override.yml
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Google Cloud credentials
+.gcloud/
+
+# Firebase cache
+.firebase/
+
+# Private keys and certificates
+*.pem
+*.key
+
+# Analysis artifacts (contain third-party secrets)
+ifood_app.js
+analysis_output.txt
+analyze_secrets*.py
+
+# Local build/deploy configs
+cloudbuild.local.yaml
+start_production_engine.ps1
+
+# Windows artifacts
+nul
